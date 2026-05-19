@@ -29,25 +29,30 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="CAVE 이미지 데모 세트 준비")
     parser.add_argument("--output", default="test_data/demo_images")
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument(
+        "--include-firefly-manual-samples",
+        action="store_true",
+        help="Adobe Firefly 샘플을 수동 업로드 시연용으로만 별도 폴더에 연결합니다. 평가/검증에는 사용하지 않습니다.",
+    )
     args = parser.parse_args()
 
     output = ROOT / args.output
     if args.overwrite and output.exists():
         shutil.rmtree(output)
 
-    items = _collect_items(output)
+    items = _collect_items(output, include_firefly_manual=args.include_firefly_manual_samples)
     for item in items:
         _link(item.source, item.target)
     _write_manifest(output / "manifest.csv", items)
     _write_readme(output / "README.md", items)
 
     print(f"demo image set: {output}")
-    for label in ("real", "fake", "ai_generated"):
+    for label in ("real", "fake", "manual_upload"):
         count = sum(1 for item in items if item.label == label)
         print(f"  {label}: {count}")
 
 
-def _collect_items(output: Path) -> list[DemoItem]:
+def _collect_items(output: Path, include_firefly_manual: bool = False) -> list[DemoItem]:
     items: list[DemoItem] = []
 
     real_root = ROOT / "test_data/redface/eval/real"
@@ -62,17 +67,23 @@ def _collect_items(output: Path) -> list[DemoItem]:
             name = f"redface_{method.lower()}_fake.jpg"
             items.append(DemoItem("fake", method, fake, output / "fake" / name))
 
-    generated_root = ROOT / "test_data/ai_generated"
-    for source_name, target_name in (
-        ("img_001_firefly.jpg", "firefly_img_001.jpg"),
-        ("img_002_firefly.jpg", "firefly_img_002.jpg"),
-    ):
-        source = generated_root / source_name
-        if source.exists():
-            items.append(DemoItem("ai_generated", "Firefly", source, output / "ai_generated" / target_name))
+    if include_firefly_manual:
+        generated_root = ROOT / "test_data/ai_generated"
+        for source_name, target_name in (
+            ("img_001_firefly.jpg", "firefly_img_001.jpg"),
+            ("img_002_firefly.jpg", "firefly_img_002.jpg"),
+        ):
+            source = generated_root / source_name
+            if source.exists():
+                items.append(DemoItem(
+                    "manual_upload",
+                    "Firefly manual upload only",
+                    source,
+                    output / "manual_upload" / target_name,
+                ))
 
     if not items:
-        raise SystemExit("데모 세트에 넣을 이미지가 없습니다. RedFace/ai_generated 경로를 확인하세요.")
+        raise SystemExit("데모 세트에 넣을 이미지가 없습니다. RedFace 경로를 확인하세요.")
     return items
 
 
@@ -108,8 +119,8 @@ def _write_manifest(path: Path, items: list[DemoItem]) -> None:
             writer.writerow({
                 "label": item.label,
                 "method": item.method,
-                "target_path": str(item.target.relative_to(ROOT)),
-                "source_path": str(item.source.relative_to(ROOT)),
+                "target_path": _display_path(item.target),
+                "source_path": _display_path(item.source),
             })
 
 
@@ -124,13 +135,13 @@ def _write_readme(path: Path, items: list[DemoItem]) -> None:
         "",
         "- `real/`: RedFace Original 기반 진본 얼굴 이미지",
         "- `fake/`: RedFace EFS/FAM/FR/FS 조작 방식별 이미지",
-        "- `ai_generated/`: Firefly 생성 이미지",
+        "- `manual_upload/`: 선택 옵션으로 연결되는 Firefly 수동 업로드 시연용 이미지. 평가/검증에는 사용하지 않습니다.",
         "",
         "## 파일 목록",
         "",
     ]
     for item in items:
-        lines.append(f"- `{item.target.relative_to(ROOT)}`: {item.label}, {item.method}")
+        lines.append(f"- `{_display_path(item.target)}`: {item.label}, {item.method}")
     lines.extend([
         "",
         "## 검증",
@@ -139,8 +150,18 @@ def _write_readme(path: Path, items: list[DemoItem]) -> None:
         "python scripts/evaluate_image_audit.py --input-dir test_data/demo_images",
         "```",
         "",
+        "Adobe Firefly 출력물은 Adobe 약관상 AI/ML 모델 학습·테스트·개선 목적으로 사용하지 않습니다.",
+        "이 스크립트의 Firefly 옵션은 사용자가 웹 화면에서 수동으로 업로드해보는 시연 자산을 별도 폴더에 연결할 때만 사용합니다.",
+        "",
     ])
     path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _display_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
 
 
 if __name__ == "__main__":

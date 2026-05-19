@@ -210,7 +210,7 @@ cave_pipeline/
 ├── test_data/              # 테스트용 파일
 │   ├── real/               # 진짜 영상
 │   ├── deepfake/           # 딥페이크 영상
-│   └── ai_generated/       # AI 생성 이미지 (C2PA 포함)
+│   └── ai_generated/       # 로컬 수동 업로드 시연용 AI 생성 이미지 (학습·평가 제외)
 └── output/
     └── report.pdf          # 최종 출력
 ```
@@ -219,7 +219,7 @@ cave_pipeline/
 
 ## 데이터 준비 계획
 
-1. **AI 생성 이미지 (C2PA 포함)**: Google ImageFX(imagesfx.google.com) 또는 Adobe Firefly에서 생성 → C2PA manifest 자동 삽입
+1. **AI 생성 이미지 수동 업로드 샘플**: Adobe Firefly 등 생성형 AI 서비스 출력물은 로컬 웹 시연에서 사용자가 업로드해보는 예시 파일로만 사용한다. AI/ML 모델 학습·테스트·개선, calibration, benchmark, 성능 평가에는 사용하지 않는다.
 2. **진짜 영상**: CC0 라이선스 영상 또는 직접 촬영
 3. **딥페이크 영상**: SimSwap 오픈소스 모델로 직접 생성
 4. **C2PA 검증 확인**: https://contentcredentials.org/verify
@@ -266,7 +266,7 @@ cave_pipeline/
 - **평가 결과**:
   - Layer 3 image detector: AUC `0.977`, acc@0.5 `0.938`, best threshold `0.489`, best acc `0.950`
   - 방식별 AUC: EFS `1.000`, FAM `0.927`, FR `1.000`, FS `0.980`
-- **해석**: RedFace 계열 얼굴 조작 이미지와 Firefly/SDXL-like 이미지 데모에는 충분히 쓸 수 있다. 다만 특정 데이터셋과 현재 보정값에 맞춘 결과이므로, 완전한 범용 탐지기나 법적 확정 판정기로 표현하지 않는다.
+- **해석**: RedFace 계열 얼굴 조작 이미지 데모에는 충분히 쓸 수 있다. 다만 특정 데이터셋과 현재 보정값에 맞춘 결과이므로, 완전한 범용 탐지기나 법적 확정 판정기로 표현하지 않는다. Adobe Firefly 출력물은 약관 준수를 위해 학습·평가·검증 지표에는 포함하지 않고 수동 업로드 시연용으로만 둔다.
 
 #### 레이어 5 — 이미지 생성 모델 핑거프린트 attribution
 
@@ -350,11 +350,11 @@ cave_pipeline/
 - **구성 목적**:
   - `real/`: RedFace Original 기반 진본 얼굴 이미지 샘플
   - `fake/`: RedFace EFS/FAM/FR/FS 조작 방식별 샘플
-  - `ai_generated/`: Firefly 등 일반 AI 생성 이미지 샘플
+  - `manual_upload/`: 선택 옵션으로 연결되는 Firefly 등 수동 업로드 시연용 샘플. 평가 정확도 계산에서는 제외
 - **검증 명령**:
   - `python scripts/evaluate_image_audit.py --input-dir test_data/demo_images`
   - `python main.py test_data/demo_images/fake/redface_efs_fake.jpg --demo`
-- **현재 검증 결과**: demo image 7장 기준 expected label과 Audit predicted label이 `7/7` 일치. RedFace fake 4장은 출처 인증 부재로 `ai_suspected_unverified`와 정밀 감정 필요가 뜨고, Firefly 2장은 C2PA/워터마크/탐지 레이어가 함께 양성이라 `ai_generated_likely`로 판정된다. RedFace real 1장은 `authentic_likely`로 판정된다.
+- **현재 검증 결과**: 기본 평가는 RedFace real/fake 데모 샘플 5장만 포함한다. `exact_match=5/5`, review `0`, RedFace fake 4장은 `ai_suspected_unverified`, RedFace real 1장은 `authentic_likely`로 판정된다. Firefly 등 생성형 AI 서비스 출력물은 수동 업로드 시연용으로만 취급하며, 평가 정확도·benchmark·calibration 계산에서 제외한다.
 
 ### 전체 레이어 통합 평가
 
@@ -364,13 +364,13 @@ cave_pipeline/
   - `full_pipeline_damage_rows.csv`: Layer 7 피해/GNN 시나리오별 구조화 결과
   - `full_pipeline_summary.json`: 기계 판독용 요약
   - `full_pipeline_summary.md`: 발표/보고서용 Markdown 표
-- **기본 실행 결과**:
+- **기본 실행 기준**:
   - 명령: `python scripts/evaluate_full_pipeline.py --output-dir output/full_eval`
-  - 평가 파일: demo image `7`, demo video `5`, FFPP eval sample `12` → 총 `24`
-  - demo_images: decided exact `7/7`, all exact `7/7`, review `0`, FP `0`, FN `0`
-  - demo_videos: decided exact `5/5`, all exact `5/5`, review `0`, FP `0`, FN `0`
-  - ffpp_eval_sample: decided exact `6/6`, all exact `6/12`, review `6`, FP `0`, FN `0`
-  - overall: decided exact `18/18`, all exact `18/24`, review `6`, FP `0`, FN `0`
+  - 평가 파일: demo image는 RedFace real/fake 기본 세트 `5`장만 포함하고, Firefly 수동 업로드 샘플은 제외한다.
+  - demo_images: exact `5/5`, review `0`, FP `0`, FN `0`
+  - demo_videos: FFPP 기반 real/deepfake 시연 세트로 평가
+  - ffpp_eval_sample: FFPP eval split에서 method별 샘플링 평가
+  - accuracy/AUC 요약은 RedFace/FFPP 등 평가 가능한 데이터셋만 comparable row로 집계한다.
   - Layer 7 예시: deepfake sexual demo는 `GNN risk=0.993`, `GNN 환산=4.965`, `heuristic=2.956`, `blend=65:35`, total `21.97`
 
 ### 평가 명령

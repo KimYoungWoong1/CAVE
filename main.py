@@ -1,7 +1,7 @@
 """CAVE Pipeline — AI 생성물 증거 검증 및 피해 정량화 파이프라인.
 
 실행 예시:
-  python main.py test_data/ai_generated/sample.jpg
+  python main.py path/to/image_or_video
   python main.py test_data/deepfake/video.mp4 --crime-type deepfake_sexual
   python main.py image.jpg --case-number "2025고단1234" --analyst "홍길동"
   python main.py image.jpg --demo   # 데모 입력값 사용 (실제 파일 없어도 실행)
@@ -271,7 +271,7 @@ def main():
     if not Path(file_path).exists():
         if args.demo:
             # 데모: 더미 파일 생성
-            dummy = Path("test_data/ai_generated/demo_sample.jpg")
+            dummy = Path("test_data/local_demo/demo_sample.jpg")
             dummy.parent.mkdir(parents=True, exist_ok=True)
             if not dummy.exists():
                 dummy.write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 100)  # 최소 JPEG 헤더

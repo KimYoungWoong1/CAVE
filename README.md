@@ -240,19 +240,24 @@ FaceForensics++ C23은 real/deepfake 영상 구분과 영상 기반 feature 학�
 - 로컬 정리 경로:
   - `test_data/ffpp_c23/{calibration,eval,holdout}/{real,deepfake}`
 
-### Adobe Firefly AI-generated Image Samples
+### Adobe Firefly Manual Upload Samples
 
-Adobe Firefly로 생성한 AI 이미지 샘플을 이미지 탐지 데모와 검증용으로 활용했습니다.
+Adobe Firefly로 직접 생성한 비민감 이미지는 로컬 웹 시연에서 사용자가 업로드해보는 예시 파일로만 다루었습니다.
 
-- 활용 레이어: Layer 3, Layer 5, Layer 6
-- 활용 목적:
-  - 실제 AI 생성 이미지 업로드 시나리오 구성
-  - 이미지 AI detector 결과 확인
-  - fingerprint attribution 결과 확인
-  - Cross-layer Audit에서 출처 정보 부재와 AI 탐지 신호의 조합 확인
-- 로컬 사용 경로:
+Adobe의 [Generative AI User Guidelines](https://www.adobe.com/go/GenAIwebUserGuidelines)는 Firefly output을 AI/ML 모델의 학습, 테스트, 개선 목적으로 사용하는 것을 제한하므로, Firefly 이미지는 CAVE의 모델 학습, calibration, benchmark, 정량 평가에는 사용하지 않습니다.
+
+- 사용 범위:
+  - 웹 UI에서 수동으로 업로드해보는 시연용 예시
+  - 레이어별 출력 형식을 확인하는 비정량 데모
+- 사용하지 않는 범위:
+  - 모델 학습
+  - calibration
+  - benchmark
+  - 성능 평가 또는 검증 지표 산출
+- 로컬 보관 경로:
   - `test_data/ai_generated`
-  - `test_data/demo_images`
+- GitHub 포함 여부:
+  - 포함하지 않음
 
 ### Demo Video/Image Sets
 
@@ -268,6 +273,9 @@ Adobe Firefly로 생성한 AI 이미지 샘플을 이미지 탐지 데모와 검
   - 웹 UI에서 real/fake 대조군 시연
   - 레이어별 점수와 최종 Audit 판정 비교
   - 딥페이크 성범죄 유포 시나리오 데모 구성
+- 참고:
+  - Adobe Firefly 등 생성형 AI 서비스 출력물은 기본 demo/evaluation set에서 제외합니다.
+  - Firefly 샘플을 연결할 경우 `manual_upload/` 폴더에 별도로 두며, 평가 정확도 계산에는 포함하지 않습니다.
 
 ### Synthetic Propagation Graph Data
 

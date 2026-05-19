@@ -4,6 +4,9 @@
 한 번에 실행하고 발표/보고서에 바로 넣을 수 있는 CSV/JSON/Markdown
 요약을 생성한다.
 
+Adobe Firefly 등 생성형 AI 서비스 출력물은 AI/ML 모델 학습·테스트·개선
+목적으로 사용하지 않기 위해 기본 통합 평가 대상에서 제외한다.
+
 실행:
   python scripts/evaluate_full_pipeline.py
   python scripts/evaluate_full_pipeline.py --skip-ffpp
@@ -120,6 +123,11 @@ def main() -> None:
     parser.add_argument("--output-dir", default="output/full_eval")
     parser.add_argument("--skip-ffpp", action="store_true", help="느린 FFPP 샘플 평가 생략")
     parser.add_argument("--skip-rppg", action="store_true", help="영상 rPPG 평가 생략")
+    parser.add_argument(
+        "--include-manual-upload-samples",
+        action="store_true",
+        help="Firefly 등 수동 업로드 시연용 샘플도 CSV에 포함합니다. 요약 정확도 계산에서는 제외됩니다.",
+    )
     args = parser.parse_args()
 
     output_dir = ROOT / args.output_dir
@@ -128,7 +136,7 @@ def main() -> None:
     media_rows: list[dict[str, Any]] = []
     damage_rows: list[dict[str, Any]] = []
 
-    image_files = _image_files(ROOT / args.image_dir)
+    image_files = _image_files(ROOT / args.image_dir, include_manual=args.include_manual_upload_samples)
     if image_files:
         manifest = _read_manifest(ROOT / args.image_dir)
         media_rows.extend(
@@ -473,10 +481,15 @@ def _render_markdown(summary: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _image_files(root: Path) -> list[Path]:
+def _image_files(root: Path, include_manual: bool = False) -> list[Path]:
     if not root.exists():
         return []
-    return sorted(path for path in root.rglob("*") if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS)
+    return sorted(
+        path for path in root.rglob("*")
+        if path.is_file()
+        and path.suffix.lower() in IMAGE_EXTENSIONS
+        and (include_manual or not _is_manual_upload_sample(path))
+    )
 
 
 def _video_files(root: Path) -> list[Path]:
@@ -524,19 +537,27 @@ def _read_manifest(root: Path) -> dict[str, dict[str, str]]:
 
 
 def _image_expected(path: Path, manifest: dict[str, dict[str, str]]) -> str:
+    if _is_manual_upload_sample(path):
+        return "manual_upload"
     row = manifest.get(str(path.resolve()), {})
     label = row.get("label", "").lower()
     if label == "real":
         return "real"
-    if label in {"fake", "ai_generated"}:
+    if label == "fake":
         return "ai"
     parts = {part.lower() for part in path.parts}
     name = path.name.lower()
     if "real" in parts or "real" in name:
         return "real"
-    if "fake" in parts or "ai_generated" in parts or "fake" in name or "firefly" in name:
+    if "fake" in parts or "fake" in name:
         return "ai"
     return "unknown"
+
+
+def _is_manual_upload_sample(path: Path) -> bool:
+    parts = {part.lower() for part in path.parts}
+    name = path.name.lower()
+    return bool(parts & {"manual_upload", "ai_generated"}) or "firefly" in name or "adobe" in name
 
 
 def _manifest_method(path: Path, manifest: dict[str, dict[str, str]], default: str = "unknown") -> str:
