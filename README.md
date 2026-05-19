@@ -204,6 +204,85 @@ python scripts/evaluate_image_audit.py
 
 The evaluation scripts summarize layer scores, audit decisions, and Layer 7 GNN harm assessment results.
 
+## 활용 데이터
+
+이 프로젝트는 이미지, 영상, 유포 그래프 정황을 분리해 각 레이어에 맞게 활용했습니다.
+
+### RedFace
+
+RedFace는 실제 환경의 얼굴 딥페이크 생성 상황을 반영한 데이터셋으로, 이미지 기반 생성 흔적 분석에 활용했습니다.
+
+- 활용 레이어: Layer 3, Layer 5
+- 활용 목적:
+  - real/fake 이미지 분리
+  - 이미지 fingerprint classifier 학습 및 평가
+  - EFS, FAM, FR, FS 방식군을 파일명 prefix로 보존해 생성 방식별 attribution 근거로 활용
+- 로컬 정리 경로:
+  - `test_data/redface/{calibration,eval,holdout}/{real,fake}`
+
+### FaceForensics++ C23
+
+FaceForensics++ C23은 real/deepfake 영상 구분과 영상 기반 feature 학습에 활용했습니다.
+
+- 활용 레이어: Layer 3, Layer 4, Layer 5
+- 활용 목적:
+  - 영상 deepfake detector calibration
+  - face crop 기반 video fingerprint classifier 학습
+  - rPPG feature classifier 학습
+  - real/deepfake 영상 쌍 비교 평가
+- 포함 방식군:
+  - Deepfakes
+  - Face2Face
+  - FaceShifter
+  - FaceSwap
+  - NeuralTextures
+  - DeepFakeDetection
+- 로컬 정리 경로:
+  - `test_data/ffpp_c23/{calibration,eval,holdout}/{real,deepfake}`
+
+### Adobe Firefly AI-generated Image Samples
+
+Adobe Firefly로 생성한 AI 이미지 샘플을 이미지 탐지 데모와 검증용으로 활용했습니다.
+
+- 활용 레이어: Layer 3, Layer 5, Layer 6
+- 활용 목적:
+  - 실제 AI 생성 이미지 업로드 시나리오 구성
+  - 이미지 AI detector 결과 확인
+  - fingerprint attribution 결과 확인
+  - Cross-layer Audit에서 출처 정보 부재와 AI 탐지 신호의 조합 확인
+- 로컬 사용 경로:
+  - `test_data/ai_generated`
+  - `test_data/demo_images`
+
+### Demo Video/Image Sets
+
+웹 시연을 위해 이미지와 영상 샘플을 별도 demo set으로 구성했습니다.
+
+- 이미지:
+  - `test_data/demo_images/real`
+  - `test_data/demo_images/fake`
+- 영상:
+  - `test_data/demo_videos/real`
+  - `test_data/demo_videos/deepfake`
+- 활용 목적:
+  - 웹 UI에서 real/fake 대조군 시연
+  - 레이어별 점수와 최종 Audit 판정 비교
+  - 딥페이크 성범죄 유포 시나리오 데모 구성
+
+### Synthetic Propagation Graph Data
+
+Layer 7의 GNN 피해 확산 산정과 재유포 위험도 모델에는 유포 정황 기반 합성 그래프 데이터를 활용했습니다.
+
+- 활용 레이어: Layer 7
+- 활용 목적:
+  - 게시물 수, 플랫폼 수, 공유 수, 조회수, 확산 속도를 graph feature로 변환
+  - 변형본, 폐쇄형 플랫폼 유포, 삭제 후 재등장 여부를 graph motif로 반영
+  - GNN spread risk model 학습
+  - RandomForest redistribution risk classifier 학습
+- 관련 스크립트:
+  - `scripts/train_gnn_spread.py`
+  - `scripts/train_redistribution_risk.py`
+
 ## Data Policy
 
 Original datasets and generated outputs are not included in this repository.
