@@ -59,6 +59,7 @@ Digital File
   - GenImage 기반 general AIGC detector
   - 얼굴 crop 기반 이미지 탐지 신호
   - RedFace 얼굴 조작 detector와 GenImage 일반 생성 detector ensemble
+  - correlated artifact 신호를 하나로 묶는 consensus guard로 일반 이미지 오탐 억제
   - calibration score 적용
 - 영상:
   - MediaPipe 기반 face crop/align
@@ -88,6 +89,7 @@ Digital File
 - C2PA, watermark, AI detection, rPPG, fingerprint 결과를 통합
 - 출처 기반 신호와 탐지 기반 신호의 충돌 여부 판단
 - 최종 판정, consistency score, expert review 필요 여부 산출
+- 이미지에서는 단일 generic artifact 신호만으로 AI라고 단정하지 않고 정밀감정 권고로 제한
 - 영상에서는 detector, rPPG, fingerprint 조합을 함께 반영
 
 ### Layer 7. GNN-based Harm Assessment

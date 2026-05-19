@@ -746,6 +746,7 @@ def _fingerprint_evidence_rows(result) -> list[tuple[str, str]]:
         ("calibrated_prob", "보정 확률"),
         ("threshold", "영상 threshold"),
         ("heuristic", "Heuristic"),
+        ("consensus", "Consensus"),
         ("face_detected", "Face crop"),
         ("temporal_delta", "Temporal delta"),
         ("genimage_auc", "GenImage AUC"),

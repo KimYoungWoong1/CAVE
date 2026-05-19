@@ -26,6 +26,9 @@ AI_LOW  = 0.30    # 이하 → 인간 제작 신호
 VIDEO_SOFT_SUPPORT = 0.60
 VIDEO_MID_SUPPORT = 0.45
 VIDEO_RPPG_STRONG_SUPPORT = 0.70
+IMAGE_DETECTOR_STRONG_SUPPORT = 0.75
+IMAGE_FINGERPRINT_STRONG_SUPPORT = 0.80
+IMAGE_MID_SUPPORT = 0.55
 LOW_CONSISTENCY_REVIEW = 0.35
 
 
@@ -167,8 +170,8 @@ def run(layer_results: dict) -> CrossLayerResult:
     if (
         c2pa_s is None
         and not is_video_input
-        and ai_s is not None and ai_s >= AI_HIGH
-        and fp_s is not None and fp_s >= AI_HIGH
+        and ai_s is not None and ai_s >= IMAGE_DETECTOR_STRONG_SUPPORT
+        and fp_s is not None and fp_s >= IMAGE_FINGERPRINT_STRONG_SUPPORT
     ):
         clash_details.append(
             "[이미지 탐지 일치] C2PA 출처 인증은 없지만 이미지 AI detector와 "
@@ -226,6 +229,8 @@ def run(layer_results: dict) -> CrossLayerResult:
         notes_parts.append("출처 인증 없이 탐지 모듈이 AI/딥페이크 신호를 제시함. 모델 편향 가능성을 고려해 정밀 감정 권고.")
     elif verdict == "video_review_recommended":
         notes_parts.append("영상 레이어에서 복수의 약한 신호가 모였으나 확정 수준은 아니므로 정밀 감정 권고.")
+    elif verdict == "image_review_recommended":
+        notes_parts.append("이미지 탐지 신호가 있으나 일반 이미지 오탐 가능성을 고려해 확정 대신 정밀 감정을 권고.")
     elif any("이미지 탐지 일치" in d for d in clash_details):
         notes_parts.append("이미지 레이어 3과 레이어 5가 같은 방향의 AI 생성 신호를 제시함.")
     elif any("모델 탐지 불일치" in d for d in clash_details):
@@ -389,14 +394,33 @@ def _apply_judgment_matrix(
                 False,
             )
 
-    # 출처 인증 또는 AI 마커 없이 탐지 모듈만 강하게 양성인 경우.
-    # provenance가 없으면 모델 편향 가능성을 열어두고 정밀 감정 권고로 둔다.
-    if summary["ai"] >= 2 and not provenance_ai_support and rppg_s is None:
-        return (
-            "ai_suspected_unverified",
-            "AI/딥페이크 의심 — 출처 인증 없는 탐지 양성",
-            True,
-        )
+    # 이미지 입력에서는 general_aigc/fingerprint의 도메인 편향을 고려해
+    # 단순 0.60 기준이 아니라 더 강한 detector+fingerprint 동의를 요구한다.
+    if rppg_s is None and not provenance_ai_support:
+        detector_strong = ai_s is not None and ai_s >= IMAGE_DETECTOR_STRONG_SUPPORT
+        fingerprint_image_strong = fp_s is not None and fp_s >= IMAGE_FINGERPRINT_STRONG_SUPPORT
+        detector_mid = ai_s is not None and ai_s >= IMAGE_MID_SUPPORT
+        fingerprint_mid = fp_s is not None and fp_s >= IMAGE_MID_SUPPORT
+        if detector_strong and fingerprint_image_strong:
+            return (
+                "ai_suspected_unverified",
+                "AI/딥페이크 의심 — 이미지 detector와 fingerprint 강한 동의",
+                True,
+            )
+        if (detector_mid and fingerprint_image_strong) or (detector_strong and fingerprint_mid):
+            return (
+                "image_review_recommended",
+                "이미지 정밀 감정 권고 — 탐지 신호는 있으나 단정 기준 미달",
+                True,
+            )
+        if ai_s is not None and ai_s < 0.55 and (fp_s is None or fp_s < IMAGE_FINGERPRINT_STRONG_SUPPORT):
+            return (
+                "authentic_likely",
+                "진본 가능성 높음 — 이미지 detector 강한 양성 없음",
+                False,
+            )
+        if len(strong_ai_layers) == 1 and len(strong_human_layers) == 0:
+            return ("uncertain", "판정 불확실 — 단일 이미지 AI 신호만 존재", True)
 
     if (
         rppg_s is not None

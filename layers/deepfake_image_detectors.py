@@ -69,8 +69,8 @@ def predict_image_detector_suite(
     }
     features.update(face_suite.feature_map)
 
-    raw_probability = _default_raw_probability(features)
-    probability, calibration_note = _calibrate_probability(raw_probability, features)
+    raw_probability = _default_raw_probability(features, detected)
+    probability, calibration_note = _calibrate_probability(raw_probability, features, detected)
 
     model_summary = ", ".join(
         f"{name}={features.get(name, 0.0):.3f}"
@@ -115,20 +115,33 @@ def _safe_fingerprint_score(path: Path) -> Optional[float]:
         return None
 
 
-def _default_raw_probability(features: dict[str, float]) -> float:
+def _default_raw_probability(features: dict[str, float], face_detected: bool) -> float:
+    face_signal = _face_support(features, face_detected)
+    generic_signal = _generic_artifact_support(features)
+    face_weight = 0.16 if face_detected else 0.04
+    eff_weight = 0.10 if face_detected else 0.03
+    xception_weight = 0.06 if face_detected else 0.02
+    generic_total = 1.0 - face_weight - eff_weight - xception_weight
     return _clamp01(
-        0.30 * features.get("diffusion_detector", 0.5)
-        + 0.24 * features.get("general_aigc", 0.5)
-        + 0.16 * features.get("fingerprint", 0.5)
-        + 0.14 * features.get("face_ensemble_raw", 0.5)
-        + 0.10 * features.get("deepfakebench_efficientnet_b4", 0.5)
-        + 0.06 * features.get("faceforge_xception", 0.5)
+        generic_total * (
+            0.58 * features.get("diffusion_detector", 0.5)
+            + 0.42 * generic_signal
+        )
+        + face_weight * face_signal
+        + eff_weight * features.get("deepfakebench_efficientnet_b4", 0.5)
+        + xception_weight * features.get("faceforge_xception", 0.5)
     )
 
 
-def _calibrate_probability(raw_probability: float, features: dict[str, float]) -> tuple[float, str]:
+def _calibrate_probability(
+    raw_probability: float,
+    features: dict[str, float],
+    face_detected: bool,
+) -> tuple[float, str]:
     calibration_path = _active_calibration_path()
     calibration = _load_calibration()
+    local_probability = raw_probability
+    local_note = "default weighted ensemble"
     if calibration:
         method = calibration.get("method")
         if method == "logistic":
@@ -138,17 +151,134 @@ def _calibrate_probability(raw_probability: float, features: dict[str, float]) -
                 z = float(calibration.get("intercept", 0.0))
                 for name, coefficient in zip(feature_order, coefficients):
                     z += float(coefficient) * float(features.get(name, 0.5))
-                probability = _sigmoid(z)
-                probability, suffix = _blend_uncalibrated_general_aigc(probability, features, feature_order)
-                return probability, f"local logistic calibration: {calibration_path.name}{suffix}"
+                local_probability = _sigmoid(z)
+                local_probability, suffix = _blend_uncalibrated_general_aigc(
+                    local_probability,
+                    features,
+                    feature_order,
+                )
+                local_note = f"local logistic calibration: {calibration_path.name}{suffix}"
         elif method == "threshold_shift":
             threshold = float(calibration.get("decision_threshold", 0.5))
             temperature = float(calibration.get("temperature", 0.75))
-            return _threshold_shift(raw_probability, threshold, temperature), (
-                f"local threshold calibration threshold={threshold:.3f}"
-            )
+            local_probability = _threshold_shift(raw_probability, threshold, temperature)
+            local_note = f"local threshold calibration threshold={threshold:.3f}"
 
-    return raw_probability, "default uncalibrated weighted ensemble"
+    consensus = _consensus_probability(features, face_detected)
+    probability, guard_note = _apply_real_guard(local_probability, consensus, features, face_detected)
+    return probability, (
+        f"{local_note}; consensus={consensus:.3f}; {guard_note}"
+    )
+
+
+def _consensus_probability(features: dict[str, float], face_detected: bool) -> float:
+    """단일 feature spike보다 복수 독립 신호 일치를 우선하는 보수적 score."""
+    diffusion = features.get("diffusion_detector", 0.5)
+    generic = _generic_artifact_support(features)
+    face_signal = _face_support(features, face_detected)
+    signals = [diffusion, generic]
+    if face_detected:
+        signals.append(face_signal)
+
+    ordered = sorted((_clamp01(value) for value in signals), reverse=True)
+    top1 = ordered[0]
+    top2 = ordered[1] if len(ordered) > 1 else 0.5
+    mean_signal = float(np.mean(ordered))
+    score = _clamp01(0.16 + 0.34 * top1 + 0.38 * top2 + 0.12 * mean_signal)
+
+    # 강한 단일 detector만 튀는 경우에는 "AI"가 아니라 "검토" 수준으로 제한한다.
+    if top2 < 0.45:
+        score = min(score, 0.44)
+    elif top2 < 0.55:
+        score = min(score, 0.52)
+    elif top2 < 0.62:
+        score = min(score, 0.60)
+
+    if not face_detected:
+        if diffusion < 0.45 and generic < 0.60:
+            score = min(score, 0.50)
+        if diffusion < 0.35 and generic < 0.70:
+            score = min(score, 0.46)
+
+    if diffusion < 0.35 and generic < 0.55:
+        score = min(score, 0.42)
+    if face_detected and generic >= 0.88 and diffusion < 0.55:
+        floor = 0.66 if face_signal >= 0.45 else 0.58
+        score = max(score, floor)
+        score = min(score, 0.68 if face_signal >= 0.45 else 0.60)
+    return _clamp01(score)
+
+
+def _apply_real_guard(
+    local_probability: float,
+    consensus: float,
+    features: dict[str, float],
+    face_detected: bool,
+) -> tuple[float, str]:
+    diffusion = features.get("diffusion_detector", 0.5)
+    generic = _generic_artifact_support(features)
+    face = _face_support(features, face_detected)
+    independent = [diffusion, generic]
+    if face_detected:
+        independent.append(face)
+
+    ordered = sorted((_clamp01(value) for value in independent), reverse=True)
+    top1 = ordered[0]
+    top2 = ordered[1] if len(ordered) > 1 else 0.5
+    probability = _clamp01(0.70 * consensus + 0.30 * local_probability)
+    caps: list[float] = []
+
+    correlated_face_artifact = face_detected and generic >= 0.88 and diffusion < 0.55
+    if not correlated_face_artifact:
+        if top2 < 0.45:
+            caps.append(0.44)
+        elif top2 < 0.55:
+            caps.append(0.54)
+        elif top2 < 0.62:
+            caps.append(0.62)
+
+    if not face_detected and diffusion < 0.55 and generic < 0.68:
+        caps.append(0.58)
+    if not face_detected and diffusion < 0.40 and generic < 0.58:
+        caps.append(0.50)
+    if correlated_face_artifact:
+        caps.append(0.68 if face >= 0.45 else 0.60)
+    elif generic >= 0.80 and diffusion < 0.55 and face < 0.60:
+        caps.append(0.58)
+    elif generic >= 0.80 and diffusion < 0.80 and face < 0.60:
+        caps.append(0.65)
+    if diffusion >= 0.85 and generic < 0.55:
+        caps.append(0.56)
+
+    if caps:
+        cap = min(caps)
+        probability = min(probability, cap)
+        return _clamp01(probability), (
+            f"consensus_guard top1={top1:.3f}, top2={top2:.3f}, cap={cap:.3f}"
+        )
+
+    return _clamp01(probability), f"consensus_guard top1={top1:.3f}, top2={top2:.3f}, cap=none"
+
+
+def _face_support(features: dict[str, float], face_detected: bool) -> float:
+    if not face_detected:
+        return 0.5
+    return _clamp01(
+        0.30 * features.get("face_ensemble_raw", 0.5)
+        + 0.20 * features.get("deepfakebench_efficientnet_b4", 0.5)
+        + 0.15 * features.get("faceforge_xception", 0.5)
+        + 0.15 * features.get("deepfakebench_resnet18", 0.5)
+        + 0.15 * features.get("deepfakebench_r3d18", 0.5)
+        + 0.05 * features.get("legacy_efficientnet_b0", 0.5)
+    )
+
+
+def _generic_artifact_support(features: dict[str, float]) -> float:
+    """GenImage RF와 Layer 5 fingerprint는 같은 handcrafted family라 하나의 신호로 묶는다."""
+    return _clamp01(
+        0.55 * features.get("general_aigc", 0.5)
+        + 0.45 * features.get("fingerprint", 0.5)
+    )
 
 
 def _blend_uncalibrated_general_aigc(

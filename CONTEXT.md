@@ -227,6 +227,7 @@ cave_pipeline/
 ## 현재 구현 및 데이터 적용 상태
 
 - **이미지 AI 탐지**: `Organika/sdxl-detector` diffusion detector를 유지하고, GenImage 기반 general AIGC classifier, 얼굴 crop 기반 Xception/EfficientNet/R3D 계열 앙상블, fingerprint 점수를 결합한다.
+- **이미지 오탐 억제 재설계**: `general_aigc`와 Layer 5 `fingerprint`는 같은 handcrafted FFT/잔차 feature family에서 나온 상관 신호로 보고 하나의 generic artifact signal로 묶는다. 출처 인증이 없는 이미지는 Organika diffusion 또는 얼굴 조작 detector가 함께 지지할 때만 강한 AI 의심으로 올리고, 단일 generic artifact spike는 정밀감정 권고 또는 불확실로 제한한다.
 - **영상 딥페이크 탐지**: MediaPipe 얼굴 crop/align 후 DeepfakeBench-style EfficientNet-B4, Xception, R3D-18, ResNet18, legacy EfficientNet-B0 앙상블을 적용한다.
 - **rPPG 생체 신호**: 영상은 CHROM rPPG feature를 추출한 뒤 FFPP C23으로 학습한 RandomForest classifier를 보조 AI 레이어로 사용한다. 모델 파일이 없으면 CHROM heuristic으로 fallback한다.
 - **생성 모델 핑거프린트**: 이미지는 RedFace feature로 학습한 RandomForest fingerprint classifier와 GenImage 기반 generator fingerprint classifier를 ensemble한다. 영상은 FFPP C23 얼굴 crop 시계열 feature로 학습한 video fingerprint classifier를 별도로 사용한다. 각 모델 파일이 없으면 기존 heuristic으로 fallback한다.
@@ -300,7 +301,8 @@ cave_pipeline/
 
 - 정지 이미지는 레이어 4 rPPG가 `None`으로 제외된다.
 - C2PA 매니페스트 부재와 저신뢰 워터마크 부재는 “인간 제작 증거”로 취급하지 않고 Audit에서 제외한다.
-- 이미지에서 레이어 3과 레이어 5가 함께 강한 AI 신호를 내면 `AI 생성 가능성 높음 — 탐지 모델과 핑거프린트 일치` 또는 출처 인증 없는 탐지 양성으로 판정한다.
+- 이미지에서 출처 인증이 없을 때는 레이어 3 detector `>=0.75`와 레이어 5 fingerprint `>=0.80`이 함께 강한 경우에만 `ai_suspected_unverified`로 올린다.
+- 한쪽이 강하고 다른 한쪽이 중간 수준이면 `image_review_recommended`로 두어, 실제 이미지가 generic artifact feature 때문에 AI로 오탐되는 일을 줄인다.
 - C2PA/워터마크가 인간 방향인데 레이어 3/5가 AI 방향이면 Integrity Clash 또는 정밀 감정 필요로 올라간다.
 
 ### 영상 레이어 4 구현 상태

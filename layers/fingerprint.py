@@ -177,11 +177,11 @@ def _image_learned_result(
     genimage: Optional[LearnedFingerprintPrediction],
 ) -> FingerprintResult:
     if redface is not None and genimage is not None:
-        ai_score = round(_clamp01(
-            0.42 * redface.probability
-            + 0.43 * genimage.probability
-            + 0.15 * heuristic_score
-        ), 3)
+        ai_score = _image_consensus_fingerprint_score(
+            redface.probability,
+            genimage.probability,
+            heuristic_score,
+        )
         confidence = round(_clamp01(
             0.38 * redface.confidence
             + 0.42 * genimage.confidence
@@ -213,6 +213,7 @@ def _image_learned_result(
             "redface_method": redface.method,
             "heuristic": f"{heuristic_score:.3f}",
             "final": f"{ai_score:.3f}",
+            "consensus": _fingerprint_consensus_label(redface.probability, genimage.probability, heuristic_score),
             "genimage_auc": _fmt_optional(genimage.test_auc),
             "redface_auc": _fmt_optional(redface.test_auc),
             "test_auc": _fmt_optional(max(
@@ -221,7 +222,7 @@ def _image_learned_result(
             ) if genimage.test_auc is not None or redface.test_auc is not None else None),
         }
     elif genimage is not None:
-        ai_score = round(_clamp01(0.85 * genimage.probability + 0.15 * heuristic_score), 3)
+        ai_score = _image_single_model_score(genimage.probability, heuristic_score)
         confidence = round(_clamp01(0.70 * genimage.confidence + 0.30 * _confidence(ai_score, features)), 3)
         generation_method = _image_method_label(genimage, genimage=True, ai_score=ai_score)
         model_family = "GenImage generator fingerprint classifier" if ai_score >= AI_MID else "unknown"
@@ -241,12 +242,13 @@ def _image_learned_result(
             "generator": genimage.method,
             "heuristic": f"{heuristic_score:.3f}",
             "final": f"{ai_score:.3f}",
+            "consensus": _fingerprint_consensus_label(None, genimage.probability, heuristic_score),
             "genimage_auc": _fmt_optional(genimage.test_auc),
             "test_auc": _fmt_optional(genimage.test_auc),
         }
     else:
         assert redface is not None
-        ai_score = round(_clamp01(0.85 * redface.probability + 0.15 * heuristic_score), 3)
+        ai_score = _image_single_model_score(redface.probability, heuristic_score)
         confidence = round(_clamp01(0.70 * redface.confidence + 0.30 * _confidence(ai_score, features)), 3)
         generation_method = _image_method_label(redface, genimage=False, ai_score=ai_score)
         model_family = "RedFace-style fingerprint classifier" if ai_score >= AI_MID else "unknown"
@@ -267,6 +269,7 @@ def _image_learned_result(
             "redface_method": redface.method,
             "heuristic": f"{heuristic_score:.3f}",
             "final": f"{ai_score:.3f}",
+            "consensus": _fingerprint_consensus_label(redface.probability, None, heuristic_score),
             "redface_auc": _fmt_optional(redface.test_auc),
             "test_auc": _fmt_optional(redface.test_auc),
         }
@@ -292,6 +295,46 @@ def _image_method_label(
     if genimage:
         return f"general-aigc:{prediction.method}"
     return prediction.method
+
+
+def _image_consensus_fingerprint_score(redface: float, genimage: float, heuristic: float) -> float:
+    redface = _clamp01(redface)
+    genimage = _clamp01(genimage)
+    heuristic = _clamp01(heuristic)
+
+    # Heuristic은 압축/샤프닝된 real 이미지에서도 쉽게 포화되므로 강한 독립 증거로 보지 않는다.
+    if redface >= 0.80:
+        score = 0.80 * redface + 0.12 * genimage + 0.08 * heuristic
+    elif genimage >= 0.80:
+        score = 0.80 * genimage + 0.12 * redface + 0.08 * heuristic
+    else:
+        score = 0.47 * redface + 0.47 * genimage + 0.06 * heuristic
+        weaker = min(redface, genimage)
+        if weaker < 0.50:
+            score = min(score, 0.54)
+        elif weaker < 0.58:
+            score = min(score, 0.58)
+        elif weaker < 0.66:
+            score = min(score, 0.62)
+    return round(_clamp01(score), 3)
+
+
+def _image_single_model_score(probability: float, heuristic: float) -> float:
+    score = _clamp01(0.78 * probability + 0.22 * heuristic)
+    if min(probability, heuristic) < 0.55:
+        score = min(score, 0.54)
+    return round(_clamp01(score), 3)
+
+
+def _fingerprint_consensus_label(
+    redface: Optional[float],
+    genimage: Optional[float],
+    heuristic: float,
+) -> str:
+    values = [value for value in (redface, genimage) if value is not None]
+    strong = sum(1 for value in values if value >= 0.65)
+    mid = sum(1 for value in values if value >= 0.55)
+    return f"learned_strong={strong}, learned_mid={mid}, heuristic={heuristic:.3f}"
 
 
 def _run_video(path: Path) -> FingerprintResult:
