@@ -127,6 +127,18 @@ Streamlit 기반 로컬 웹 데모를 제공합니다.
 6. Cross-layer Audit 근거 확인
 7. GNN 피해 확산 위험도 및 재유포 위험도 확인
 
+## Output Examples
+
+아래 이미지는 README에 원본 데이터셋 이미지나 민감한 피해자 예시를 포함하지 않기 위해, 실제 로컬 파이프라인 실행 결과의 점수와 판정만 요약해 만든 출력 화면입니다.
+
+![CAVE 실제 출력 요약](docs/assets/readme_demo_summary.png)
+
+이 예시는 세 가지 대비를 보여줍니다.
+
+- AI 생성/조작 의심 샘플은 Layer 3 AI detector와 Layer 5 generator fingerprint가 모두 강한 신호를 보일 때 Cross-layer Audit이 정밀 감정 필요 판정을 내립니다.
+- 진본 가능성이 높은 샘플은 detector와 fingerprint 점수가 모두 낮게 유지되어, 단순히 C2PA가 없다는 이유만으로 AI 생성물이라고 단정하지 않습니다.
+- 피해 규모 산정은 이미지/영상 파일 자체만으로 계산하지 않고, 유포 플랫폼, 게시물 수, 조회수, 변형본, 폐쇄형 플랫폼 유포 여부 같은 정황을 GNN/RF 기반 위험도로 반영합니다.
+
 ## Scenario Example
 
 대표 시나리오는 딥페이크 성범죄 의심 이미지/영상 유포 사건입니다.
