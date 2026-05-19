@@ -139,6 +139,13 @@ Streamlit 기반 로컬 웹 데모를 제공합니다.
 - 진본 가능성이 높은 샘플은 detector와 fingerprint 점수가 모두 낮게 유지되어, 단순히 C2PA가 없다는 이유만으로 AI 생성물이라고 단정하지 않습니다.
 - 피해 규모 산정은 이미지/영상 파일 자체만으로 계산하지 않고, 유포 플랫폼, 게시물 수, 조회수, 변형본, 폐쇄형 플랫폼 유포 여부 같은 정황을 GNN/RF 기반 위험도로 반영합니다.
 
+실제 Streamlit 화면 캡처는 아래와 같습니다. 공개 README에 데이터셋 원본 미디어가 재배포되지 않도록 입력 이미지 영역은 캡처 직전에 흐림 처리했습니다.
+
+<p align="center">
+  <img src="docs/assets/cave_screen_ai_suspected.png" alt="CAVE AI suspected Streamlit screen" width="49%">
+  <img src="docs/assets/cave_screen_authentic_likely.png" alt="CAVE authentic likely Streamlit screen" width="49%">
+</p>
+
 ## Scenario Example
 
 대표 시나리오는 딥페이크 성범죄 의심 이미지/영상 유포 사건입니다.
