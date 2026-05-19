@@ -36,6 +36,8 @@ Digital File
 
 각 레이어는 독립적인 신호를 생성하고, Cross-layer Audit은 출처 기반 신호와 탐지 기반 신호가 서로 일관되는지 확인합니다. 이후 Layer 7은 게시물 수, 플랫폼 수, 공유 수, 조회수, 변형본 존재, 폐쇄형 플랫폼 유포 여부 등을 바탕으로 GNN 기반 피해 확산 위험을 산정합니다.
 
+![CAVE 모델 파이프라인](docs/assets/cave_pipeline.png)
+
 ## Implemented Layers
 
 ### Layer 1. Provenance Authentication
@@ -112,6 +114,14 @@ Digital File
   - 피해자 특정 가능성
   - 얼굴/음성 동일성 점수
   - 성적 조작, 협박성, 명예훼손성, 평판 손실 여부
+
+## GNN Harm Propagation
+
+Layer 7은 유포 정황 입력을 분석용 그래프 표현으로 변환한 뒤, GNN 기반 전파 위험도와 learned redistribution risk를 함께 반영합니다.
+
+![Layer 7 GNN 피해 확산 시각화](docs/assets/gnn_spread_graph.png)
+
+이 그래프는 실제 SNS 크롤링 원본을 포함하지 않습니다. 사용자가 입력한 게시물 수, 플랫폼 수, 공유 수, 조회수, 변형본 존재, 폐쇄형 플랫폼 유포 여부를 기반으로 구성한 approximate propagation graph이며, 피해 규모 산정의 근거를 설명하기 위한 시각화입니다.
 
 ## Web Demo
 
@@ -192,7 +202,10 @@ CAVE/
 │   ├── train_rppg_classifier.py
 │   ├── train_gnn_spread.py
 │   ├── train_redistribution_risk.py
-│   └── evaluate_full_pipeline.py
+│   ├── evaluate_full_pipeline.py
+│   ├── generate_readme_demo_assets.py
+│   ├── generate_readme_architecture_assets.py
+│   └── capture_readme_screenshots.py
 ├── models/                        # Small local checkpoints and calibration files
 ├── requirements.txt
 └── CONTEXT.md
