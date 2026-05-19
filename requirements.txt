@@ -12,6 +12,7 @@ torch>=2.0.0
 torchvision>=0.15.0
 transformers>=4.30.0
 huggingface-hub>=0.20.0
+datasets>=2.19.0
 opencv-python>=4.8.0
 mediapipe>=0.10.35
 timm>=1.0.0

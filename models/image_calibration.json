@@ -1,18 +1,20 @@
 {
   "method": "logistic",
-  "intercept": -2.509960177373989,
+  "intercept": -3.1708939490700723,
   "coefficients": [
-    -0.2503405449429176,
-    4.868332158356577,
-    0.047152006324770075,
-    -0.33921126452005335,
-    0.050629316773275014,
-    0.2790072003002426,
-    0.47043060640880524,
-    -0.45374664092947514
+    0.5585931376474692,
+    2.690854248056711,
+    2.810191179208886,
+    0.024630735941084624,
+    -0.01786167932992691,
+    -0.2951376267805223,
+    0.49428759553874363,
+    0.3049964237587913,
+    -0.2529781164970949
   ],
   "feature_order": [
     "diffusion_detector",
+    "general_aigc",
     "fingerprint",
     "face_ensemble_raw",
     "faceforge_xception",
@@ -24,13 +26,16 @@
   "samples": 160,
   "real_dir": "test_data/redface/calibration/real",
   "fake_dir": "test_data/redface/calibration/fake",
-  "max_per_label": 80,
-  "fake_per_method": 20,
-  "note": "Local image calibration for RedFace-style face forgery and diffusion images.",
+  "genimage_real_dir": "test_data/genimage/calibration/real",
+  "genimage_ai_dir": "test_data/genimage/calibration/ai",
+  "max_per_label": 40,
+  "fake_per_method": 10,
+  "genimage_max_per_label": 40,
+  "note": "Local image calibration for RedFace-style face forgery, GenImage AIGC, and diffusion images.",
   "training_metrics": {
-    "auc": 1.0,
-    "accuracy": 0.99375,
-    "best_threshold": 0.4438435152198905,
-    "best_accuracy": 1.0
+    "auc": 0.9875,
+    "accuracy": 0.9375,
+    "best_threshold": 0.43162289206821186,
+    "best_accuracy": 0.95
   }
 }

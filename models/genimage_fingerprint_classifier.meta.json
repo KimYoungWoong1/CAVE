@@ -1,0 +1,62 @@
+{
+  "task": "genimage_fingerprint_real_ai_and_generator_attribution",
+  "data_source": "GenImage",
+  "feature_order": [
+    "high_freq_ratio",
+    "mid_freq_ratio",
+    "low_freq_ratio",
+    "spectral_flatness",
+    "spectral_centroid",
+    "spectral_rolloff",
+    "channel_noise_corr",
+    "block_periodicity",
+    "residual_strength",
+    "residual_mean_abs",
+    "residual_skewness",
+    "residual_kurtosis",
+    "gray_entropy",
+    "gradient_energy",
+    "color_std_mean",
+    "saturation_mean",
+    "saturation_std"
+  ],
+  "train_samples": 1200,
+  "eval_samples": 400,
+  "max_per_label": 0,
+  "seed": 42,
+  "test_auc": 0.875475,
+  "test_accuracy": 0.7725,
+  "test_balanced_accuracy": 0.7725,
+  "best_threshold": 0.4126701853701857,
+  "best_accuracy": 0.8,
+  "generator_accuracy": 0.78,
+  "generator_metrics": {
+    "GLIDE": {
+      "count": 40,
+      "prob_mean": 0.9544393556606792,
+      "auc_vs_real": 0.993625
+    },
+    "Midjourney": {
+      "count": 40,
+      "prob_mean": 0.628703894542957,
+      "auc_vs_real": 0.859375
+    },
+    "SD15": {
+      "count": 40,
+      "prob_mean": 0.6847869542402257,
+      "auc_vs_real": 0.90075
+    },
+    "VQDM": {
+      "count": 40,
+      "prob_mean": 0.513002865581526,
+      "auc_vs_real": 0.757625
+    },
+    "Wukong": {
+      "count": 40,
+      "prob_mean": 0.6306906635353885,
+      "auc_vs_real": 0.866
+    }
+  },
+  "created_at": "2026-05-19T16:14:28.955280+00:00",
+  "note": "RandomForest classifier over FFT/residual/noise features for GenImage generator attribution."
+}

@@ -162,6 +162,7 @@ CAVE/
 ├── scripts/
 │   ├── prepare_redface_dataset.py
 │   ├── prepare_genimage_dataset.py
+│   ├── prepare_tiny_genimage_dataset.py
 │   ├── prepare_faceforensics_dataset.py
 │   ├── train_fingerprint_classifier.py
 │   ├── train_general_aigc_classifier.py
@@ -243,11 +244,14 @@ GenImage는 얼굴 딥페이크 전용이 아니라 일반 AI 생성 이미지 �
 - 준비 및 학습 명령:
 
 ```bash
+python scripts/prepare_tiny_genimage_dataset.py --overwrite
 python scripts/prepare_genimage_dataset.py --source GenImage --overwrite
 python scripts/train_general_aigc_classifier.py --max-per-label 3000
 python scripts/train_genimage_fingerprint_classifier.py --max-per-label 3000
 python scripts/calibrate_image_detector.py --max-per-label 80 --fake-per-method 20
 ```
+
+대용량 원본 GenImage 전체가 부담되는 경우에는 `prepare_tiny_genimage_dataset.py`를 우선 사용합니다. 이 스크립트는 Hugging Face Tiny-GenImage를 streaming으로 읽고, 선택한 generator에서 필요한 수량만 JPEG로 저장합니다. 기본 generator는 `Midjourney`, `SD15`, `GLIDE`, `Wukong`, `VQDM`입니다.
 
 ### FaceForensics++ C23
 

@@ -234,7 +234,8 @@ cave_pipeline/
 - **RedFace 적용**: `RedFace/` 원본을 `test_data/redface/{calibration,eval,holdout}/{real,fake}`로 정리했다. fake는 EFS/FAM/FR/FS 방식이 파일명 prefix로 보존된다.
 - **RedFace 영상 적용**: `RedFace/FR/videos`는 `test_data/redface_video/{calibration,eval,holdout}/deepfake`로 정리했다. RedFace 내 real video counterpart는 없으므로 영상 calibration에는 보조 데이터로만 사용한다.
 - **FaceForensics++ C23 적용**: `FaceForensics++_C23/` 원본을 `test_data/ffpp_c23/{calibration,eval,holdout}/{real,deepfake}`로 정리했다. fake 파일명은 Deepfakes/Face2Face/FaceShifter/FaceSwap/NeuralTextures/DeepFakeDetection prefix를 유지한다.
-- **GenImage 적용 경로 추가**: `scripts/prepare_genimage_dataset.py`가 GenImage 원본을 `test_data/genimage/{calibration,eval,holdout}/{real,ai}`로 정리한다. Layer 3 general AIGC classifier와 Layer 5 generator fingerprint classifier의 학습 입력으로 사용한다.
+- **GenImage 적용 경로 추가**: `scripts/prepare_genimage_dataset.py`가 GenImage 원본을 `test_data/genimage/{calibration,eval,holdout}/{real,ai}`로 정리한다. 원본 GenImage가 너무 클 경우 `scripts/prepare_tiny_genimage_dataset.py`로 Hugging Face Tiny-GenImage에서 선택 generator만 streaming 저장한다. Layer 3 general AIGC classifier와 Layer 5 generator fingerprint classifier의 학습 입력으로 사용한다.
+- **Tiny-GenImage 로컬 적용**: 기본 generator는 Midjourney/SD15/GLIDE/Wukong/VQDM이며, 현재 `test_data/genimage`에는 calibration `1,200`, eval `400`, holdout `400`장, 총 `2,000`장 샘플을 저장했다. 저장 시 JPEG로 통일해 파일 포맷 편향과 용량을 줄였다.
 - **Calibration 파일**:
   - 기본 이미지 calibration: `models/image_calibration.json`
   - general AIGC classifier 학습 후 생성 경로: `models/general_aigc_classifier.joblib`
@@ -268,6 +269,8 @@ cave_pipeline/
   - RedFace 얼굴 조작 detector와 GenImage 일반 생성 detector를 이미지 ensemble feature로 함께 사용한다.
   - `models/image_calibration.json`의 logistic calibration으로 최종 `ai_probability`를 산출한다.
 - **현재 평가 기준**: RedFace eval split에서 `python scripts/compare_image_dataset.py --max-per-label 40 --fake-per-method 10 --seed 42` 실행.
+- **Tiny-GenImage 평가 결과**:
+  - Layer 3 general AIGC classifier: AUC `0.873`, acc@0.5 `0.780`, best threshold `0.417`, best acc `0.800`
 - **평가 결과**:
   - Layer 3 image detector: AUC `0.977`, acc@0.5 `0.938`, best threshold `0.489`, best acc `0.950`
   - 방식별 AUC: EFS `1.000`, FAM `0.927`, FR `1.000`, FS `0.980`
@@ -285,6 +288,8 @@ cave_pipeline/
   - GenImage generator attribution: 원본 generator 폴더명을 보존해 `general-aigc:{generator}` 형태로 표시한다.
   - 모델 파일이 없거나 로딩 실패 시 FFT/노이즈 heuristic fallback으로 동작한다.
 - **현재 학습 기준**: RedFace calibration split에서 `python scripts/train_fingerprint_classifier.py --max-per-label 600 --fake-per-method 150 --seed 42` 실행.
+- **Tiny-GenImage 평가 결과**:
+  - Layer 5 GenImage fingerprint classifier: AUC `0.875`, acc@0.5 `0.772`, best threshold `0.413`, best acc `0.800`, generator attribution accuracy `0.780`
 - **평가 결과**:
   - Layer 5 fingerprint classifier: AUC `0.943`, acc@0.5 `0.883`, balanced acc@0.5 `0.883`, best threshold `0.462`, best acc `0.889`
   - Method attribution accuracy: `0.920`
@@ -394,6 +399,7 @@ CAVE_VIDEO_CALIBRATION=models/video_calibration_ffpp_c23_balanced.json python sc
 python scripts/train_gnn_spread.py --epochs 80 --samples 1000 --device cpu
 python scripts/train_redistribution_risk.py --samples-per-class 1200 --seed 42
 python scripts/train_fingerprint_classifier.py --max-per-label 600 --fake-per-method 150
+python scripts/prepare_tiny_genimage_dataset.py --overwrite
 python scripts/prepare_genimage_dataset.py --source GenImage --overwrite
 python scripts/train_general_aigc_classifier.py --max-per-label 3000
 python scripts/train_genimage_fingerprint_classifier.py --max-per-label 3000
