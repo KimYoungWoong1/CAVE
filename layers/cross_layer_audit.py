@@ -413,6 +413,12 @@ def _apply_judgment_matrix(
                 "이미지 정밀 감정 권고 — 탐지 신호는 있으나 단정 기준 미달",
                 True,
             )
+        if detector_mid and fingerprint_mid:
+            return (
+                "image_review_recommended",
+                "이미지 정밀 감정 권고 — 중간 탐지 신호가 복수 존재",
+                True,
+            )
         if ai_s is not None and ai_s < 0.55 and (fp_s is None or fp_s < IMAGE_FINGERPRINT_STRONG_SUPPORT):
             return (
                 "authentic_likely",
@@ -421,6 +427,13 @@ def _apply_judgment_matrix(
             )
         if len(strong_ai_layers) == 1 and len(strong_human_layers) == 0:
             return ("uncertain", "판정 불확실 — 단일 이미지 AI 신호만 존재", True)
+        if detector_mid or fingerprint_mid:
+            return ("uncertain", "판정 불확실 — 이미지 단일/약한 탐지 신호", True)
+        return (
+            "authentic_likely",
+            "진본 가능성 높음 — 이미지 탐지 신호 약함",
+            False,
+        )
 
     if (
         rppg_s is not None
