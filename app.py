@@ -821,10 +821,24 @@ def _inject_css() -> None:
             background: var(--cave-bg);
             color: var(--cave-text);
         }
+        header[data-testid="stHeader"] {
+            height: 0;
+            visibility: hidden;
+        }
+        [data-testid="stToolbar"],
+        [data-testid="stDecoration"],
+        #MainMenu,
+        footer {
+            display: none;
+            visibility: hidden;
+        }
         .block-container {
             max-width: 1280px;
-            padding-top: 1.35rem;
+            padding-top: 2rem;
             padding-bottom: 3rem;
+        }
+        [data-testid="stSidebarContent"] {
+            padding-top: 2.1rem;
         }
         [data-testid="stSidebar"] {
             background: #ffffff;
