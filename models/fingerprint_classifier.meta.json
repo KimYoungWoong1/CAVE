@@ -1,0 +1,58 @@
+{
+  "task": "fingerprint_real_fake_and_method_attribution",
+  "data_source": "RedFace",
+  "feature_order": [
+    "high_freq_ratio",
+    "mid_freq_ratio",
+    "low_freq_ratio",
+    "spectral_flatness",
+    "spectral_centroid",
+    "spectral_rolloff",
+    "channel_noise_corr",
+    "block_periodicity",
+    "residual_strength",
+    "residual_mean_abs",
+    "residual_skewness",
+    "residual_kurtosis",
+    "gray_entropy",
+    "gradient_energy",
+    "color_std_mean",
+    "saturation_mean",
+    "saturation_std"
+  ],
+  "train_samples": 1200,
+  "eval_samples": 1200,
+  "fake_per_method": 150,
+  "max_per_label": 600,
+  "seed": 42,
+  "test_auc": 0.9427944444444445,
+  "test_accuracy": 0.8833333333333333,
+  "test_balanced_accuracy": 0.8833333333333333,
+  "best_threshold": 0.46218056950394626,
+  "best_accuracy": 0.8891666666666667,
+  "method_accuracy": 0.92,
+  "method_metrics": {
+    "EFS": {
+      "count": 150,
+      "prob_mean": 0.9641570724932073,
+      "auc_vs_real": 0.9998777777777778
+    },
+    "FAM": {
+      "count": 150,
+      "prob_mean": 0.7559768665802026,
+      "auc_vs_real": 0.8676777777777778
+    },
+    "FR": {
+      "count": 150,
+      "prob_mean": 0.9095616486062145,
+      "auc_vs_real": 0.9979888888888889
+    },
+    "FS": {
+      "count": 150,
+      "prob_mean": 0.5188066345289862,
+      "auc_vs_real": 0.9056333333333333
+    }
+  },
+  "created_at": "2026-05-17T12:21:01.887948+00:00",
+  "note": "RandomForest classifier over FFT/residual/noise fingerprint features."
+}

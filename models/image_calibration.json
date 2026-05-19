@@ -1,0 +1,36 @@
+{
+  "method": "logistic",
+  "intercept": -2.509960177373989,
+  "coefficients": [
+    -0.2503405449429176,
+    4.868332158356577,
+    0.047152006324770075,
+    -0.33921126452005335,
+    0.050629316773275014,
+    0.2790072003002426,
+    0.47043060640880524,
+    -0.45374664092947514
+  ],
+  "feature_order": [
+    "diffusion_detector",
+    "fingerprint",
+    "face_ensemble_raw",
+    "faceforge_xception",
+    "deepfakebench_efficientnet_b4",
+    "deepfakebench_resnet18",
+    "deepfakebench_r3d18",
+    "legacy_efficientnet_b0"
+  ],
+  "samples": 160,
+  "real_dir": "test_data/redface/calibration/real",
+  "fake_dir": "test_data/redface/calibration/fake",
+  "max_per_label": 80,
+  "fake_per_method": 20,
+  "note": "Local image calibration for RedFace-style face forgery and diffusion images.",
+  "training_metrics": {
+    "auc": 1.0,
+    "accuracy": 0.99375,
+    "best_threshold": 0.4438435152198905,
+    "best_accuracy": 1.0
+  }
+}

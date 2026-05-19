@@ -1,0 +1,67 @@
+{
+  "task": "rppg_feature_real_fake_anomaly_detection",
+  "data_source": "FaceForensics++ C23",
+  "feature_order": [
+    "heuristic_ai_score",
+    "naturalness",
+    "band_power_ratio",
+    "peak_prominence",
+    "temporal_stability",
+    "peak_bpm_norm",
+    "bpm_plausibility",
+    "sample_rate_norm",
+    "duration_norm",
+    "frame_count_norm",
+    "face_detected_ratio"
+  ],
+  "train_samples": 66,
+  "eval_samples": 48,
+  "train_skipped": 0,
+  "eval_skipped": 0,
+  "fake_per_method": 6,
+  "eval_fake_per_method": 4,
+  "max_per_label": 30,
+  "eval_max_per_label": 24,
+  "seed": 42,
+  "test_auc": 0.5694444444444444,
+  "raw_test_auc": 0.4305555555555556,
+  "invert_probability": true,
+  "test_accuracy": 0.5625,
+  "test_balanced_accuracy": 0.5625,
+  "best_threshold": 0.38214662430941826,
+  "best_accuracy": 0.6041666666666666,
+  "method_metrics": {
+    "DeepFakeDetection": {
+      "count": 4,
+      "prob_mean": 0.2079708101869804,
+      "auc_vs_real": 0.17708333333333334
+    },
+    "Deepfakes": {
+      "count": 4,
+      "prob_mean": 0.510103901250644,
+      "auc_vs_real": 0.59375
+    },
+    "Face2Face": {
+      "count": 4,
+      "prob_mean": 0.4998250358322079,
+      "auc_vs_real": 0.6458333333333334
+    },
+    "FaceShifter": {
+      "count": 4,
+      "prob_mean": 0.4821635349673772,
+      "auc_vs_real": 0.625
+    },
+    "FaceSwap": {
+      "count": 4,
+      "prob_mean": 0.4663365099735226,
+      "auc_vs_real": 0.5520833333333334
+    },
+    "NeuralTextures": {
+      "count": 4,
+      "prob_mean": 0.6212398529655778,
+      "auc_vs_real": 0.8229166666666666
+    }
+  },
+  "created_at": "2026-05-17T19:35:28.731988+00:00",
+  "note": "RandomForest classifier over CHROM rPPG physiological features."
+}

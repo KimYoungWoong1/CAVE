@@ -1,0 +1,30 @@
+{
+  "method": "logistic",
+  "intercept": -0.39436197398813033,
+  "coefficients": [
+    0.32731697284819483,
+    0.37548507400778613,
+    0.6426843638707149,
+    0.17283195620318467,
+    0.4442530055461729,
+    -0.20021125528034342
+  ],
+  "feature_order": [
+    "ensemble_raw",
+    "faceforge_xception",
+    "deepfakebench_resnet18",
+    "deepfakebench_r3d18",
+    "deepfakebench_efficientnet_b4",
+    "legacy_efficientnet_b0"
+  ],
+  "samples": 8,
+  "real_dir": "test_data/real",
+  "fake_dir": "test_data/deepfake",
+  "note": "Small local calibration for demo data; do not treat as forensic validation.",
+  "training_metrics": {
+    "auc": 1.0,
+    "accuracy": 0.875,
+    "best_threshold": 0.6129329993274667,
+    "best_accuracy": 1.0
+  }
+}

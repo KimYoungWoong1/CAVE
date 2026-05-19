@@ -1,0 +1,46 @@
+# macOS / editor
+.DS_Store
+._*
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local secrets / environment
+.env
+.env.*
+*.pem
+*.key
+*.secret
+
+# Large or licensed datasets
+FaceForensics++_C23/
+RedFace/
+data/
+test_data/
+
+# Generated outputs
+output/
+*.pdf
+*.csv
+
+# Local assistant/tool state
+.claude/
+
+# Model/cache downloads
+.cache/
+cache/
+downloads/
