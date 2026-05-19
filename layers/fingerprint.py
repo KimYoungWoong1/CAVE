@@ -29,6 +29,9 @@ VIDEO_THRESHOLD_TARGET = 0.60
 MAX_ANALYSIS_SIZE = 512
 VIDEO_SAMPLE_FRAMES = 12
 CLASSIFIER_PATH = Path(__file__).resolve().parents[1] / "models" / "fingerprint_classifier.joblib"
+GENIMAGE_FINGERPRINT_CLASSIFIER_PATH = (
+    Path(__file__).resolve().parents[1] / "models" / "genimage_fingerprint_classifier.joblib"
+)
 VIDEO_CLASSIFIER_PATH = Path(__file__).resolve().parents[1] / "models" / "video_fingerprint_classifier.joblib"
 FINGERPRINT_FEATURE_ORDER = [
     "high_freq_ratio",
@@ -81,6 +84,8 @@ _VIDEO_METHOD_LABELS = {
 
 _CLASSIFIER_CACHE: Optional[dict] = None
 _CLASSIFIER_MTIME: Optional[float] = None
+_GENIMAGE_CLASSIFIER_CACHE: Optional[dict] = None
+_GENIMAGE_CLASSIFIER_MTIME: Optional[float] = None
 _VIDEO_CLASSIFIER_CACHE: Optional[dict] = None
 _VIDEO_CLASSIFIER_MTIME: Optional[float] = None
 
@@ -125,6 +130,7 @@ def _run_image(path: Path) -> FingerprintResult:
         features = _extract_features(rgb)
         heuristic_score = _score_features(features)
         learned = _predict_learned(features)
+        genimage = _predict_genimage_learned(features)
     except Exception as exc:
         return FingerprintResult(
             ai_likelihood=None,
@@ -138,36 +144,8 @@ def _run_image(path: Path) -> FingerprintResult:
             ),
         )
 
-    if learned is not None:
-        ai_score = round(_clamp01(0.85 * learned.probability + 0.15 * heuristic_score), 3)
-        likelihood = _likelihood_label(ai_score)
-        generation_method = learned.method if ai_score >= AI_MID else "unknown"
-        model_family = "learned fingerprint classifier" if ai_score >= AI_MID else "unknown"
-        confidence = round(_clamp01(0.70 * learned.confidence + 0.30 * _confidence(ai_score, features)), 3)
-        return FingerprintResult(
-            ai_likelihood=likelihood,
-            generation_method=generation_method,
-            model_family=model_family,
-            confidence=confidence,
-            ai_score=ai_score,
-            notes=(
-                "학습 기반 fingerprint classifier 분석. "
-                f"learned_prob={learned.probability:.3f}, heuristic={heuristic_score:.3f}, "
-                f"final={ai_score:.3f}, method={learned.method}, "
-                f"source={learned.source}, test_auc={_fmt_optional(learned.test_auc)}. "
-                f"high_freq={features['high_freq_ratio']:.3f}, "
-                f"spectral_flatness={features['spectral_flatness']:.3f}, "
-                f"channel_noise_corr={features['channel_noise_corr']:.3f}, "
-                f"residual_strength={features['residual_strength']:.3f}. "
-                "특정 생성 모델명이 아닌 RedFace-style 조작 계열 attribution."
-            ),
-            evidence={
-                "learned_prob": f"{learned.probability:.3f}",
-                "heuristic": f"{heuristic_score:.3f}",
-                "final": f"{ai_score:.3f}",
-                "test_auc": _fmt_optional(learned.test_auc),
-            },
-        )
+    if learned is not None or genimage is not None:
+        return _image_learned_result(features, heuristic_score, learned, genimage)
 
     ai_score = heuristic_score
     likelihood = _likelihood_label(ai_score)
@@ -190,6 +168,130 @@ def _run_image(path: Path) -> FingerprintResult:
             "특정 모델명 단정이 아닌 diffusion-like 생성 흔적 추정값."
         ),
     )
+
+
+def _image_learned_result(
+    features: dict[str, float],
+    heuristic_score: float,
+    redface: Optional[LearnedFingerprintPrediction],
+    genimage: Optional[LearnedFingerprintPrediction],
+) -> FingerprintResult:
+    if redface is not None and genimage is not None:
+        ai_score = round(_clamp01(
+            0.42 * redface.probability
+            + 0.43 * genimage.probability
+            + 0.15 * heuristic_score
+        ), 3)
+        confidence = round(_clamp01(
+            0.38 * redface.confidence
+            + 0.42 * genimage.confidence
+            + 0.20 * _confidence(ai_score, features)
+        ), 3)
+        stronger = genimage if genimage.probability >= redface.probability else redface
+        generation_method = _image_method_label(stronger, genimage=stronger is genimage, ai_score=ai_score)
+        model_family = (
+            "GenImage generator fingerprint + RedFace face fingerprint ensemble"
+            if ai_score >= AI_MID
+            else "unknown"
+        )
+        notes = (
+            "학습 기반 image fingerprint ensemble 분석. "
+            f"genimage_prob={genimage.probability:.3f}, redface_prob={redface.probability:.3f}, "
+            f"heuristic={heuristic_score:.3f}, final={ai_score:.3f}, "
+            f"generator={genimage.method}, redface_method={redface.method}, "
+            f"genimage_auc={_fmt_optional(genimage.test_auc)}, redface_auc={_fmt_optional(redface.test_auc)}. "
+            f"high_freq={features['high_freq_ratio']:.3f}, "
+            f"spectral_flatness={features['spectral_flatness']:.3f}, "
+            f"channel_noise_corr={features['channel_noise_corr']:.3f}, "
+            f"residual_strength={features['residual_strength']:.3f}. "
+            "일반 AI 생성 이미지 신호와 얼굴 조작 attribution을 함께 해석."
+        )
+        evidence = {
+            "genimage_prob": f"{genimage.probability:.3f}",
+            "redface_prob": f"{redface.probability:.3f}",
+            "generator": genimage.method,
+            "redface_method": redface.method,
+            "heuristic": f"{heuristic_score:.3f}",
+            "final": f"{ai_score:.3f}",
+            "genimage_auc": _fmt_optional(genimage.test_auc),
+            "redface_auc": _fmt_optional(redface.test_auc),
+            "test_auc": _fmt_optional(max(
+                value for value in (genimage.test_auc, redface.test_auc)
+                if value is not None
+            ) if genimage.test_auc is not None or redface.test_auc is not None else None),
+        }
+    elif genimage is not None:
+        ai_score = round(_clamp01(0.85 * genimage.probability + 0.15 * heuristic_score), 3)
+        confidence = round(_clamp01(0.70 * genimage.confidence + 0.30 * _confidence(ai_score, features)), 3)
+        generation_method = _image_method_label(genimage, genimage=True, ai_score=ai_score)
+        model_family = "GenImage generator fingerprint classifier" if ai_score >= AI_MID else "unknown"
+        notes = (
+            "학습 기반 GenImage fingerprint classifier 분석. "
+            f"genimage_prob={genimage.probability:.3f}, heuristic={heuristic_score:.3f}, "
+            f"final={ai_score:.3f}, generator={genimage.method}, "
+            f"source={genimage.source}, test_auc={_fmt_optional(genimage.test_auc)}. "
+            f"high_freq={features['high_freq_ratio']:.3f}, "
+            f"spectral_flatness={features['spectral_flatness']:.3f}, "
+            f"channel_noise_corr={features['channel_noise_corr']:.3f}, "
+            f"residual_strength={features['residual_strength']:.3f}. "
+            "GenImage-style 일반 AI 생성 이미지 generator attribution."
+        )
+        evidence = {
+            "genimage_prob": f"{genimage.probability:.3f}",
+            "generator": genimage.method,
+            "heuristic": f"{heuristic_score:.3f}",
+            "final": f"{ai_score:.3f}",
+            "genimage_auc": _fmt_optional(genimage.test_auc),
+            "test_auc": _fmt_optional(genimage.test_auc),
+        }
+    else:
+        assert redface is not None
+        ai_score = round(_clamp01(0.85 * redface.probability + 0.15 * heuristic_score), 3)
+        confidence = round(_clamp01(0.70 * redface.confidence + 0.30 * _confidence(ai_score, features)), 3)
+        generation_method = _image_method_label(redface, genimage=False, ai_score=ai_score)
+        model_family = "RedFace-style fingerprint classifier" if ai_score >= AI_MID else "unknown"
+        notes = (
+            "학습 기반 fingerprint classifier 분석. "
+            f"learned_prob={redface.probability:.3f}, heuristic={heuristic_score:.3f}, "
+            f"final={ai_score:.3f}, method={redface.method}, "
+            f"source={redface.source}, test_auc={_fmt_optional(redface.test_auc)}. "
+            f"high_freq={features['high_freq_ratio']:.3f}, "
+            f"spectral_flatness={features['spectral_flatness']:.3f}, "
+            f"channel_noise_corr={features['channel_noise_corr']:.3f}, "
+            f"residual_strength={features['residual_strength']:.3f}. "
+            "특정 생성 모델명이 아닌 RedFace-style 조작 계열 attribution."
+        )
+        evidence = {
+            "learned_prob": f"{redface.probability:.3f}",
+            "redface_prob": f"{redface.probability:.3f}",
+            "redface_method": redface.method,
+            "heuristic": f"{heuristic_score:.3f}",
+            "final": f"{ai_score:.3f}",
+            "redface_auc": _fmt_optional(redface.test_auc),
+            "test_auc": _fmt_optional(redface.test_auc),
+        }
+
+    return FingerprintResult(
+        ai_likelihood=_likelihood_label(ai_score),
+        generation_method=generation_method,
+        model_family=model_family,
+        confidence=confidence,
+        ai_score=ai_score,
+        notes=notes,
+        evidence=evidence,
+    )
+
+
+def _image_method_label(
+    prediction: LearnedFingerprintPrediction,
+    genimage: bool,
+    ai_score: float,
+) -> str:
+    if ai_score < AI_MID:
+        return "unknown"
+    if genimage:
+        return f"general-aigc:{prediction.method}"
+    return prediction.method
 
 
 def _run_video(path: Path) -> FingerprintResult:
@@ -615,6 +717,44 @@ def _predict_learned(features: dict[str, float]) -> Optional[LearnedFingerprintP
     )
 
 
+def _predict_genimage_learned(features: dict[str, float]) -> Optional[LearnedFingerprintPrediction]:
+    bundle = _load_genimage_classifier()
+    if not bundle:
+        return None
+
+    feature_order = bundle.get("feature_order", FINGERPRINT_FEATURE_ORDER)
+    vector = np.asarray([[float(features.get(name, 0.0)) for name in feature_order]], dtype=np.float64)
+    binary_model = bundle.get("binary_model")
+    if binary_model is None or not hasattr(binary_model, "predict_proba"):
+        return None
+
+    probabilities = binary_model.predict_proba(vector)[0]
+    classes = list(getattr(binary_model, "classes_", [0, 1]))
+    ai_idx = classes.index(1) if 1 in classes else int(np.argmax(classes))
+    probability = _clamp01(float(probabilities[ai_idx]))
+    confidence = _clamp01(abs(probability - 0.5) * 2.0)
+
+    method = "unknown-generator"
+    generator_model = bundle.get("generator_model")
+    if generator_model is not None and hasattr(generator_model, "predict_proba"):
+        generator_probs = generator_model.predict_proba(vector)[0]
+        generator_classes = list(getattr(generator_model, "classes_", []))
+        if generator_classes:
+            method = str(generator_classes[int(np.argmax(generator_probs))])
+            confidence = _clamp01(0.65 * confidence + 0.35 * float(np.max(generator_probs)))
+
+    meta = bundle.get("meta", {})
+    return LearnedFingerprintPrediction(
+        probability=probability,
+        method=method,
+        confidence=confidence,
+        source=str(meta.get("data_source", "unknown")),
+        test_auc=_as_optional_float(meta.get("test_auc")),
+        threshold=_as_optional_float(meta.get("best_threshold")),
+        best_accuracy=_as_optional_float(meta.get("best_accuracy")),
+    )
+
+
 def _predict_video_learned(features: dict[str, float]) -> Optional[LearnedFingerprintPrediction]:
     bundle = _load_video_classifier()
     if not bundle:
@@ -694,6 +834,32 @@ def _load_classifier() -> Optional[dict]:
         _CLASSIFIER_MTIME = mtime
         return None
     return _CLASSIFIER_CACHE
+
+
+def _load_genimage_classifier() -> Optional[dict]:
+    global _GENIMAGE_CLASSIFIER_CACHE, _GENIMAGE_CLASSIFIER_MTIME
+    if not GENIMAGE_FINGERPRINT_CLASSIFIER_PATH.exists():
+        _GENIMAGE_CLASSIFIER_CACHE = None
+        _GENIMAGE_CLASSIFIER_MTIME = None
+        return None
+
+    mtime = GENIMAGE_FINGERPRINT_CLASSIFIER_PATH.stat().st_mtime
+    if _GENIMAGE_CLASSIFIER_CACHE is not None and _GENIMAGE_CLASSIFIER_MTIME == mtime:
+        return _GENIMAGE_CLASSIFIER_CACHE
+
+    try:
+        import joblib  # type: ignore
+
+        bundle = joblib.load(GENIMAGE_FINGERPRINT_CLASSIFIER_PATH)
+        if not isinstance(bundle, dict):
+            return None
+        _GENIMAGE_CLASSIFIER_CACHE = bundle
+        _GENIMAGE_CLASSIFIER_MTIME = mtime
+    except Exception:
+        _GENIMAGE_CLASSIFIER_CACHE = None
+        _GENIMAGE_CLASSIFIER_MTIME = mtime
+        return None
+    return _GENIMAGE_CLASSIFIER_CACHE
 
 
 def _load_video_classifier() -> Optional[dict]:

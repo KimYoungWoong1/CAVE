@@ -226,16 +226,21 @@ cave_pipeline/
 
 ## 현재 구현 및 데이터 적용 상태
 
-- **이미지 AI 탐지**: `Organika/sdxl-detector` diffusion detector를 유지하고, 얼굴 crop 기반 Xception/EfficientNet/R3D 계열 앙상블과 fingerprint 점수를 결합한다.
+- **이미지 AI 탐지**: `Organika/sdxl-detector` diffusion detector를 유지하고, GenImage 기반 general AIGC classifier, 얼굴 crop 기반 Xception/EfficientNet/R3D 계열 앙상블, fingerprint 점수를 결합한다.
 - **영상 딥페이크 탐지**: MediaPipe 얼굴 crop/align 후 DeepfakeBench-style EfficientNet-B4, Xception, R3D-18, ResNet18, legacy EfficientNet-B0 앙상블을 적용한다.
 - **rPPG 생체 신호**: 영상은 CHROM rPPG feature를 추출한 뒤 FFPP C23으로 학습한 RandomForest classifier를 보조 AI 레이어로 사용한다. 모델 파일이 없으면 CHROM heuristic으로 fallback한다.
-- **생성 모델 핑거프린트**: 이미지는 RedFace feature로 학습한 RandomForest fingerprint classifier를 사용한다. 영상은 FFPP C23 얼굴 crop 시계열 feature로 학습한 video fingerprint classifier를 별도로 사용한다. 각 모델 파일이 없으면 기존 heuristic으로 fallback한다.
+- **생성 모델 핑거프린트**: 이미지는 RedFace feature로 학습한 RandomForest fingerprint classifier와 GenImage 기반 generator fingerprint classifier를 ensemble한다. 영상은 FFPP C23 얼굴 crop 시계열 feature로 학습한 video fingerprint classifier를 별도로 사용한다. 각 모델 파일이 없으면 기존 heuristic으로 fallback한다.
 - **웹 데모 UX**: `app.py`는 최종 판정, 핵심 근거 3줄, 정밀감정 권고 이유, 피해/GNN 근거를 상단에 먼저 보여준다. 사이드바에는 발견 플랫폼, 최초 발견 시각, URL/캡처 보전 수, 확산 규모, 재유포 위험, 피해자 특정성 입력 UI를 제공하며, 세부 결과는 `증거 레이어`와 `피해 산정` 탭으로 분리해 발표용으로 빠르게 읽히도록 정리했다. PDF 보고서 생성은 한글 폰트 문제로 웹 데모에서 비활성화했다.
 - **RedFace 적용**: `RedFace/` 원본을 `test_data/redface/{calibration,eval,holdout}/{real,fake}`로 정리했다. fake는 EFS/FAM/FR/FS 방식이 파일명 prefix로 보존된다.
 - **RedFace 영상 적용**: `RedFace/FR/videos`는 `test_data/redface_video/{calibration,eval,holdout}/deepfake`로 정리했다. RedFace 내 real video counterpart는 없으므로 영상 calibration에는 보조 데이터로만 사용한다.
 - **FaceForensics++ C23 적용**: `FaceForensics++_C23/` 원본을 `test_data/ffpp_c23/{calibration,eval,holdout}/{real,deepfake}`로 정리했다. fake 파일명은 Deepfakes/Face2Face/FaceShifter/FaceSwap/NeuralTextures/DeepFakeDetection prefix를 유지한다.
+- **GenImage 적용 경로 추가**: `scripts/prepare_genimage_dataset.py`가 GenImage 원본을 `test_data/genimage/{calibration,eval,holdout}/{real,ai}`로 정리한다. Layer 3 general AIGC classifier와 Layer 5 generator fingerprint classifier의 학습 입력으로 사용한다.
 - **Calibration 파일**:
   - 기본 이미지 calibration: `models/image_calibration.json`
+  - general AIGC classifier 학습 후 생성 경로: `models/general_aigc_classifier.joblib`
+  - general AIGC classifier metadata 학습 후 생성 경로: `models/general_aigc_classifier.meta.json`
+  - GenImage fingerprint classifier 학습 후 생성 경로: `models/genimage_fingerprint_classifier.joblib`
+  - GenImage fingerprint classifier metadata 학습 후 생성 경로: `models/genimage_fingerprint_classifier.meta.json`
   - 기본 영상 calibration: `models/video_calibration.json`
   - FaceForensics++ 균형 영상 calibration 후보: `models/video_calibration_ffpp_c23_balanced.json`
   - fingerprint classifier: `models/fingerprint_classifier.joblib`
@@ -258,7 +263,9 @@ cave_pipeline/
 - **구현 파일**: `layers/ai_detection.py`, `layers/deepfake_image_detectors.py`
 - **현재 구성**:
   - `Organika/sdxl-detector`로 SDXL/diffusion 계열 이미지 생성 확률을 먼저 계산한다.
+  - `models/general_aigc_classifier.joblib`가 있으면 GenImage 기반 general AIGC 확률을 추가로 계산한다.
   - Xception/EfficientNet/R3D/ResNet 계열 얼굴 조작 detector suite와 레이어 5 fingerprint 점수를 함께 사용한다.
+  - RedFace 얼굴 조작 detector와 GenImage 일반 생성 detector를 이미지 ensemble feature로 함께 사용한다.
   - `models/image_calibration.json`의 logistic calibration으로 최종 `ai_probability`를 산출한다.
 - **현재 평가 기준**: RedFace eval split에서 `python scripts/compare_image_dataset.py --max-per-label 40 --fake-per-method 10 --seed 42` 실행.
 - **평가 결과**:
@@ -271,8 +278,11 @@ cave_pipeline/
 - **구현 파일**: `layers/fingerprint.py`, `scripts/train_fingerprint_classifier.py`
 - **현재 구성**:
   - 이미지 입력에서는 `models/fingerprint_classifier.joblib`의 RandomForest classifier를 우선 사용한다.
+  - `models/genimage_fingerprint_classifier.joblib`가 있으면 GenImage 기반 generator fingerprint classifier를 함께 사용한다.
   - feature는 FFT 주파수 대역, spectral flatness/centroid/rolloff, 채널 노이즈 상관, 잔차 통계, 엔트로피, gradient, 색상·채도 통계 등 17개다.
-  - 출력은 real/fake 확률과 RedFace-style 조작 계열 attribution이다: `entire-face-synthesis`, `face-attribute-manipulation`, `face-reenactment`, `face-swap`.
+  - 출력은 real/fake 확률, RedFace-style 조작 계열 attribution, GenImage generator attribution이다.
+  - RedFace 방식군: `entire-face-synthesis`, `face-attribute-manipulation`, `face-reenactment`, `face-swap`.
+  - GenImage generator attribution: 원본 generator 폴더명을 보존해 `general-aigc:{generator}` 형태로 표시한다.
   - 모델 파일이 없거나 로딩 실패 시 FFT/노이즈 heuristic fallback으로 동작한다.
 - **현재 학습 기준**: RedFace calibration split에서 `python scripts/train_fingerprint_classifier.py --max-per-label 600 --fake-per-method 150 --seed 42` 실행.
 - **평가 결과**:
@@ -384,6 +394,9 @@ CAVE_VIDEO_CALIBRATION=models/video_calibration_ffpp_c23_balanced.json python sc
 python scripts/train_gnn_spread.py --epochs 80 --samples 1000 --device cpu
 python scripts/train_redistribution_risk.py --samples-per-class 1200 --seed 42
 python scripts/train_fingerprint_classifier.py --max-per-label 600 --fake-per-method 150
+python scripts/prepare_genimage_dataset.py --source GenImage --overwrite
+python scripts/train_general_aigc_classifier.py --max-per-label 3000
+python scripts/train_genimage_fingerprint_classifier.py --max-per-label 3000
 python scripts/train_rppg_classifier.py --max-per-label 30 --eval-max-per-label 24 --fake-per-method 6 --eval-fake-per-method 4
 python scripts/train_video_fingerprint_classifier.py --max-per-label 120 --eval-max-per-label 80 --fake-per-method 20 --eval-fake-per-method 12 --frames 8
 python scripts/calibrate_image_detector.py --max-per-label 80 --fake-per-method 20

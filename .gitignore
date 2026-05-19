@@ -29,6 +29,8 @@ env/
 # Large or licensed datasets
 FaceForensics++_C23/
 RedFace/
+GenImage/
+GenImage-Dataset/
 data/
 test_data/
 

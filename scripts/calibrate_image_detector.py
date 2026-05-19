@@ -16,6 +16,7 @@ from layers import ai_detection  # noqa: E402
 from layers.deepfake_image_detectors import CALIBRATION_PATH  # noqa: E402
 from layers.deepfake_image_detectors import DEFAULT_FEATURE_ORDER  # noqa: E402
 from layers.deepfake_image_detectors import predict_image_detector_suite  # noqa: E402
+from layers.general_aigc_detector import predict_general_aigc  # noqa: E402
 
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
@@ -25,9 +26,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="CAVE 이미지 detector 로컬 calibration")
     parser.add_argument("--real-dir", default="test_data/redface/calibration/real")
     parser.add_argument("--fake-dir", default="test_data/redface/calibration/fake")
+    parser.add_argument("--genimage-real-dir", default="test_data/genimage/calibration/real")
+    parser.add_argument("--genimage-ai-dir", default="test_data/genimage/calibration/ai")
     parser.add_argument("--output", default=str(CALIBRATION_PATH))
     parser.add_argument("--max-per-label", type=int, default=80)
     parser.add_argument("--fake-per-method", type=int, default=0)
+    parser.add_argument("--genimage-max-per-label", type=int, default=80)
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
@@ -36,6 +40,9 @@ def main() -> None:
         Path(args.fake_dir),
         args.max_per_label,
         args.fake_per_method,
+        Path(args.genimage_real_dir),
+        Path(args.genimage_ai_dir),
+        args.genimage_max_per_label,
         args.seed,
     )
     if len(rows) < 4:
@@ -50,9 +57,12 @@ def main() -> None:
         "samples": len(rows),
         "real_dir": args.real_dir,
         "fake_dir": args.fake_dir,
+        "genimage_real_dir": args.genimage_real_dir,
+        "genimage_ai_dir": args.genimage_ai_dir,
         "max_per_label": args.max_per_label,
         "fake_per_method": args.fake_per_method,
-        "note": "Local image calibration for RedFace-style face forgery and diffusion images.",
+        "genimage_max_per_label": args.genimage_max_per_label,
+        "note": "Local image calibration for RedFace-style face forgery, GenImage AIGC, and diffusion images.",
     })
 
     predictions = _predict_with_calibration(features, calibration)
@@ -78,6 +88,9 @@ def _collect_rows(
     fake_dir: Path,
     max_per_label: int,
     fake_per_method: int,
+    genimage_real_dir: Path,
+    genimage_ai_dir: Path,
+    genimage_max_per_label: int,
     seed: int,
 ) -> list[dict]:
     rng = random.Random(seed)
@@ -87,6 +100,16 @@ def _collect_rows(
     for label, label_name, files in ((0, "real", real_files), (1, "fake", fake_files)):
         for path in files:
             rows.append(_analyze_path(path, label=label, label_name=label_name))
+
+    genimage_real_files = _sample_files(genimage_real_dir, genimage_max_per_label, seed + 2)
+    genimage_ai_files = _sample_files(genimage_ai_dir, genimage_max_per_label, seed + 3)
+    for label, label_name, files in (
+        (0, "genimage_real", genimage_real_files),
+        (1, "genimage_ai", genimage_ai_files),
+    ):
+        for path in files:
+            rows.append(_analyze_path(path, label=label, label_name=label_name))
+
     rng.shuffle(rows)
     return rows
 
@@ -94,13 +117,27 @@ def _collect_rows(
 def _analyze_path(path: Path, label: int, label_name: str) -> dict:
     classifier = ai_detection._get_pipeline()
     diffusion_probability = ai_detection._extract_ai_probability(classifier(str(path)))
-    suite = predict_image_detector_suite(path, diffusion_probability=diffusion_probability)
+    general_prediction = _safe_general_aigc(path)
+    suite = predict_image_detector_suite(
+        path,
+        diffusion_probability=diffusion_probability,
+        general_aigc_probability=(
+            general_prediction.probability if general_prediction is not None else None
+        ),
+    )
     return {
         "path": str(path),
         "label": label,
         "label_name": label_name,
         "features": suite.features,
     }
+
+
+def _safe_general_aigc(path: Path):
+    try:
+        return predict_general_aigc(path)
+    except Exception:
+        return None
 
 
 def _image_files(root: Path) -> list[Path]:

@@ -24,6 +24,7 @@ from layers.video_utils import extract_face_crop_bgr
 CALIBRATION_PATH = Path(__file__).resolve().parents[1] / "models" / "image_calibration.json"
 DEFAULT_FEATURE_ORDER = [
     "diffusion_detector",
+    "general_aigc",
     "fingerprint",
     "face_ensemble_raw",
     "faceforge_xception",
@@ -52,6 +53,7 @@ class ImageDetectorSuiteResult:
 def predict_image_detector_suite(
     path: str | Path,
     diffusion_probability: Optional[float] = None,
+    general_aigc_probability: Optional[float] = None,
 ) -> ImageDetectorSuiteResult:
     image_path = Path(path)
     face_image, detected, detector = _load_face_image(image_path)
@@ -61,6 +63,7 @@ def predict_image_detector_suite(
     fingerprint_score = _safe_fingerprint_score(image_path)
     features = {
         "diffusion_detector": _coalesce(diffusion_probability, 0.5),
+        "general_aigc": _coalesce(general_aigc_probability, 0.5),
         "fingerprint": _coalesce(fingerprint_score, 0.5),
         "face_ensemble_raw": face_suite.raw_probability,
     }
@@ -114,11 +117,12 @@ def _safe_fingerprint_score(path: Path) -> Optional[float]:
 
 def _default_raw_probability(features: dict[str, float]) -> float:
     return _clamp01(
-        0.42 * features.get("diffusion_detector", 0.5)
-        + 0.18 * features.get("fingerprint", 0.5)
-        + 0.18 * features.get("face_ensemble_raw", 0.5)
-        + 0.14 * features.get("deepfakebench_efficientnet_b4", 0.5)
-        + 0.08 * features.get("faceforge_xception", 0.5)
+        0.30 * features.get("diffusion_detector", 0.5)
+        + 0.24 * features.get("general_aigc", 0.5)
+        + 0.16 * features.get("fingerprint", 0.5)
+        + 0.14 * features.get("face_ensemble_raw", 0.5)
+        + 0.10 * features.get("deepfakebench_efficientnet_b4", 0.5)
+        + 0.06 * features.get("faceforge_xception", 0.5)
     )
 
 
@@ -134,7 +138,9 @@ def _calibrate_probability(raw_probability: float, features: dict[str, float]) -
                 z = float(calibration.get("intercept", 0.0))
                 for name, coefficient in zip(feature_order, coefficients):
                     z += float(coefficient) * float(features.get(name, 0.5))
-                return _sigmoid(z), f"local logistic calibration: {calibration_path.name}"
+                probability = _sigmoid(z)
+                probability, suffix = _blend_uncalibrated_general_aigc(probability, features, feature_order)
+                return probability, f"local logistic calibration: {calibration_path.name}{suffix}"
         elif method == "threshold_shift":
             threshold = float(calibration.get("decision_threshold", 0.5))
             temperature = float(calibration.get("temperature", 0.75))
@@ -143,6 +149,21 @@ def _calibrate_probability(raw_probability: float, features: dict[str, float]) -
             )
 
     return raw_probability, "default uncalibrated weighted ensemble"
+
+
+def _blend_uncalibrated_general_aigc(
+    probability: float,
+    features: dict[str, float],
+    feature_order: list[str],
+) -> tuple[float, str]:
+    """기존 calibration 파일이 GenImage feature를 모를 때 약하게 post-blend한다."""
+    if "general_aigc" in feature_order:
+        return probability, ""
+    general = features.get("general_aigc", 0.5)
+    if abs(general - 0.5) < 0.02:
+        return probability, ""
+    blended = _clamp01(0.82 * probability + 0.18 * general)
+    return blended, " + general_aigc post-blend"
 
 
 def _load_calibration() -> Optional[dict]:

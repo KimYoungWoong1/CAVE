@@ -689,6 +689,10 @@ def _fingerprint_analysis_mode(result) -> str:
     notes = getattr(result, "notes", "") or ""
     if "학습 기반 video fingerprint classifier" in notes:
         return "학습 기반 영상 fingerprint classifier"
+    if "image fingerprint ensemble" in notes:
+        return "GenImage + RedFace 이미지 ensemble"
+    if "GenImage fingerprint classifier" in notes:
+        return "GenImage generator fingerprint"
     if "학습 기반 fingerprint classifier" in notes:
         return "학습 기반 이미지 attribution"
     if "learned_classifier=image-trained" in notes:
@@ -735,11 +739,17 @@ def _fingerprint_evidence_rows(result) -> list[tuple[str, str]]:
     evidence = getattr(result, "evidence", {}) or {}
     keys = [
         ("learned_prob", "Learned prob"),
+        ("genimage_prob", "GenImage prob"),
+        ("redface_prob", "RedFace prob"),
+        ("generator", "Generator"),
+        ("redface_method", "RedFace method"),
         ("calibrated_prob", "보정 확률"),
         ("threshold", "영상 threshold"),
         ("heuristic", "Heuristic"),
         ("face_detected", "Face crop"),
         ("temporal_delta", "Temporal delta"),
+        ("genimage_auc", "GenImage AUC"),
+        ("redface_auc", "RedFace AUC"),
         ("test_auc", "Layer 5 AUC"),
     ]
     return [

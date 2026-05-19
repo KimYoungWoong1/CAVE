@@ -20,6 +20,7 @@ from PIL import Image
 
 from layers.deepfake_image_detectors import predict_image_detector_suite
 from layers.deepfake_video_detectors import predict_video_detector_suite
+from layers.general_aigc_detector import predict_general_aigc
 from layers.video_utils import is_video_file, sample_video_face_crops
 
 
@@ -61,7 +62,14 @@ def _run_image(path: Path) -> AIDetectionResult:
         classifier = _get_pipeline()
         raw_result = classifier(str(path))
         diffusion_probability = _extract_ai_probability(raw_result)
-        suite = predict_image_detector_suite(path, diffusion_probability=diffusion_probability)
+        general_prediction = _safe_general_aigc(path)
+        suite = predict_image_detector_suite(
+            path,
+            diffusion_probability=diffusion_probability,
+            general_aigc_probability=(
+                general_prediction.probability if general_prediction is not None else None
+            ),
+        )
         ai_probability = suite.probability
     except ImportError:
         return _unavailable_result(
@@ -84,9 +92,10 @@ def _run_image(path: Path) -> AIDetectionResult:
         ai_score=ai_probability,
         notes=(
             f"{MODEL_ID} diffusion detector + 얼굴 조작 detector 앙상블 기반 이미지 분석. "
-            f"diffusion={diffusion_probability:.3f}, final={ai_probability:.3f}. "
+            f"diffusion={diffusion_probability:.3f}, {_general_aigc_note(general_prediction)}, "
+            f"final={ai_probability:.3f}. "
             f"{suite.notes}. "
-            "정지 이미지는 SDXL/diffusion 생성과 얼굴 조작 신호를 함께 해석."
+            "정지 이미지는 SDXL/diffusion 생성, 일반 AIGC, 얼굴 조작 신호를 함께 해석."
         ),
     )
 
@@ -160,6 +169,23 @@ def _get_pipeline():
             top_k=None,
         )
     return _PIPELINE
+
+
+def _safe_general_aigc(path: Path):
+    try:
+        return predict_general_aigc(path)
+    except Exception:
+        return None
+
+
+def _general_aigc_note(prediction) -> str:
+    if prediction is None:
+        return "general_aigc=unavailable"
+    auc = "N/A" if prediction.test_auc is None else f"{prediction.test_auc:.3f}"
+    return (
+        f"general_aigc={prediction.probability:.3f}, "
+        f"general_source={prediction.source}, general_auc={auc}"
+    )
 
 
 def _extract_ai_probability(raw_result: Any) -> float:
