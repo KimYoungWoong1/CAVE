@@ -230,19 +230,8 @@ def draw_damage_card(
         "#0f766e",
     )
 
-    draw.rounded_rectangle((x + 34, y + 610, x + w - 34, y + 698), radius=18, fill="#f8fafc", outline="#d7e1ed", width=2)
-    draw.text((x + 58, y + 628), "정황 입력 없음", fill="#64748b", font=font(21))
-    draw_wrapped(
-        draw,
-        f"{low_damage.grade_kr} · {low_damage.total_score:.2f} / 30 · GNN fallback={low_damage.gnn_fallback_reason}",
-        x + 58,
-        y + 658,
-        w - 116,
-        font(21),
-        fill="#172033",
-        line_spacing=5,
-        max_lines=2,
-    )
+    draw_metric_box(draw, x + 34, y + 612, 212, 86, "정황 없음", low_damage.grade_kr)
+    draw_metric_box(draw, x + 270, y + 612, 216, 86, "피해 점수", f"{low_damage.total_score:.2f} / 30")
 
 
 def draw_score_row(
