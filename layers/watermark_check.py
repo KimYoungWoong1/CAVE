@@ -1,9 +1,9 @@
 """레이어 2: 워터마크/메타 마커 탐지.
 
-SynthID, Firefly 등 주요 생성 도구의 실제 invisible watermark 탐지는
-대부분 비공개 API에 의존한다. 이 프로토타입은 공개적으로 접근 가능한
-XMP/EXIF/바이너리 문자열에서 워터마크·Content Credentials·생성 도구
-마커를 찾는 제한적 구현이다.
+주요 생성 도구의 실제 invisible watermark 탐지는 대부분 비공개 API에
+의존한다. 이 프로토타입은 공개적으로 접근 가능한 XMP/EXIF/바이너리
+문자열에서 워터마크·Content Credentials·생성 도구 마커를 찾는 제한적
+구현이다.
 """
 from __future__ import annotations
 
@@ -16,8 +16,6 @@ from PIL import Image
 
 _AI_MARKERS = (
     "synthid",
-    "firefly",
-    "adobe firefly",
     "stable diffusion",
     "midjourney",
     "dall-e",
@@ -135,5 +133,5 @@ def _build_notes(watermark_hits: list[str], ai_hits: list[str], source_count: in
         )
     return (
         f"공개 메타데이터/바이너리 텍스트 {source_count}개 소스에서 워터마크 마커를 찾지 못함. "
-        "비공개 SynthID/Firefly invisible watermark 부재를 증명하지는 않음."
+        "비공개 invisible watermark 부재를 증명하지는 않음."
     )

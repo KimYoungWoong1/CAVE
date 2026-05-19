@@ -14,7 +14,7 @@ from typing import Optional
 
 # AI 생성 도구로 알려진 claim_generator 키워드
 _AI_GENERATORS = [
-    "adobe firefly", "dall-e", "dall·e", "midjourney",
+    "dall-e", "dall·e", "midjourney",
     "stable diffusion", "imagefx", "imagen", "runway",
     "openai", "anthropic", "stability ai", "google deepmind",
     "sora", "kling", "pika", "heygen",
