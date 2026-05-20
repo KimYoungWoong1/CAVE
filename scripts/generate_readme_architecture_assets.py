@@ -36,70 +36,49 @@ def main() -> None:
 
 
 def render_pipeline() -> Image.Image:
-    img = Image.new("RGB", (1800, 1100), "#f6f8fb")
+    img = Image.new("RGB", (1800, 1000), "#f6f8fb")
     draw = ImageDraw.Draw(img)
 
     title(draw, "CAVE 모델 파이프라인", "파일 신뢰성 감사와 피해 확산 산정을 하나의 로컬 분석 흐름으로 연결")
 
-    media = (82, 470, 302, 630)
+    media = (70, 445, 292, 595)
+    group = (365, 190, 1145, 780)
+    audit = (1235, 245, 1515, 395)
+    harm = (1235, 555, 1515, 705)
+    output = (1235, 790, 1730, 890)
+
     draw_node(draw, media, "Media Upload", "이미지·영상", "#ffffff", "#0f766e", icon="01")
 
-    l1 = (390, 210, 680, 350)
-    l2 = (390, 390, 680, 530)
-    l3 = (390, 650, 680, 790)
-    l4 = (730, 650, 1020, 790)
-    l5 = (1070, 650, 1360, 790)
-    audit = (1450, 350, 1730, 520)
-    harm = (1450, 610, 1730, 780)
-    output = (1370, 870, 1730, 1010)
+    draw.rounded_rectangle((group[0] + 8, group[1] + 10, group[2] + 8, group[3] + 10), radius=30, fill="#d8e0ea")
+    draw.rounded_rectangle(group, radius=30, fill="#ffffff", outline="#d5dee9", width=2)
+    draw.text((400, 220), "Evidence Layers", fill="#14213d", font=font(34))
+    draw.text((402, 265), "출처 신호와 AI 탐지 신호를 분리해 생성한 뒤 Layer 6에서 교차 검증합니다.", fill="#526071", font=font(22))
 
-    draw.text((390, 166), "출처·무결성 신호", fill="#526071", font=font(24))
-    draw.text((390, 606), "AI 기반 탐지 신호", fill="#0f766e", font=font(24))
+    draw.text((405, 330), "출처·무결성", fill="#526071", font=font(23))
+    l1 = draw_compact_card(draw, (405, 365, 625, 475), "L1", "C2PA", "Provenance", "#64748b", "#ffffff")
+    l2 = draw_compact_card(draw, (675, 365, 945, 475), "L2", "Watermark", "Metadata signal", "#64748b", "#ffffff")
+    arrow(draw, mid_right(l1), mid_left(l2), "#94a3b8", width=4)
 
-    draw_node(draw, l1, "Layer 1", "C2PA Provenance", "#ffffff", "#64748b", icon="L1")
-    draw_node(draw, l2, "Layer 2", "Watermark·Metadata", "#ffffff", "#64748b", icon="L2")
-    draw_node(draw, l3, "Layer 3", "AI Detector Ensemble", "#ecfdf5", "#0f766e", icon="AI")
-    draw_node(draw, l4, "Layer 4", "rPPG RF Classifier", "#ecfdf5", "#0f766e", icon="RF")
-    draw_node(draw, l5, "Layer 5", "Generator Fingerprint", "#ecfdf5", "#0f766e", icon="FP")
+    draw.text((405, 520), "AI 기반 탐지", fill="#0f766e", font=font(23))
+    l3 = draw_compact_card(draw, (405, 555, 605, 665), "L3", "AI Detector", "Image/video ensemble", "#0f766e", "#ecfdf5")
+    l4 = draw_compact_card(draw, (645, 555, 845, 665), "L4", "rPPG", "RF classifier", "#0f766e", "#ecfdf5")
+    l5 = draw_compact_card(draw, (885, 555, 1110, 665), "L5", "Fingerprint", "Generator attribution", "#0f766e", "#ecfdf5")
+    arrow(draw, mid_right(l3), mid_left(l4), "#0f766e", width=4)
+    arrow(draw, mid_right(l4), mid_left(l5), "#0f766e", width=4)
+
+    draw.rounded_rectangle((405, 705, 1110, 745), radius=18, fill="#fff7ed", outline="#fed7aa", width=2)
+    draw.text((430, 715), "Image: diffusion + GenImage + RedFace · Video: face crop + rPPG + fingerprint", fill="#9a3412", font=font(19))
+
     draw_node(draw, audit, "Layer 6", "Cross-layer Audit", "#eef2ff", "#475569", icon="AUD")
     draw_node(draw, harm, "Layer 7", "GNN Harm Assessment", "#ecfdf5", "#0f766e", icon="GNN")
     draw_node(draw, output, "Output", "Verdict · Evidence · Harm Score", "#ffffff", "#b45309", icon="UI")
 
-    for target in (l1, l2, l3):
-        arrow(draw, mid_right(media), mid_left(target), "#94a3b8", width=4)
-    arrow(draw, mid_right(l3), mid_left(l4), "#0f766e", width=4)
-    arrow(draw, mid_right(l4), mid_left(l5), "#0f766e", width=4)
-    for source in (l1, l2, l5):
-        arrow(draw, mid_right(source), mid_left(audit), "#64748b", width=4)
-    arrow(draw, mid_bottom(audit), mid_top(harm), "#0f766e", width=4)
-    arrow(draw, mid_bottom(harm), mid_top(output), "#0f766e", width=4)
+    arrow(draw, mid_right(media), mid_left(group), "#94a3b8", width=5)
+    arrow(draw, mid_right(group), mid_left(audit), "#64748b", width=5)
+    arrow(draw, mid_bottom(audit), mid_top(harm), "#0f766e", width=5)
+    arrow(draw, mid_bottom(harm), mid_top(output), "#0f766e", width=5)
 
-    callout(
-        draw,
-        (730, 210, 1360, 350),
-        "Image branch",
-        "Organika diffusion detector, GenImage general AIGC detector, RedFace face manipulation detector를 ensemble로 결합합니다.",
-        "#fff7ed",
-        "#b45309",
-    )
-    callout(
-        draw,
-        (82, 720, 302, 930),
-        "Video branch",
-        "MediaPipe face crop, detector ensemble, rPPG RF, video fingerprint를 결합합니다.",
-        "#ffffff",
-        "#0f766e",
-    )
-    callout(
-        draw,
-        (730, 390, 1360, 530),
-        "Consensus guard",
-        "일반 이미지 오탐을 줄이기 위해 correlated artifact 신호를 하나로 묶고, Layer 3/5 강한 동의를 요구합니다.",
-        "#ffffff",
-        "#475569",
-    )
-
-    footer(draw, "AI 레이어: Layer 3, 4, 5, 7 · Layer 6은 출처/탐지 신호를 통합하는 판정 레이어", y=1018)
+    footer(draw, "AI 레이어: Layer 3, 4, 5, 7 · Layer 6은 출처/탐지 신호를 통합하는 판정 레이어", y=900)
     return img
 
 
@@ -175,6 +154,25 @@ def title(draw: ImageDraw.ImageDraw, main: str, sub: str) -> None:
 def footer(draw: ImageDraw.ImageDraw, text: str, *, y: int = 912) -> None:
     draw.rounded_rectangle((70, y, 1730, y + 60), radius=20, fill="#e8f3f2", outline="#b8deda", width=2)
     draw.text((102, y + 18), text, fill="#0f4f4a", font=font(22))
+
+
+def draw_compact_card(
+    draw: ImageDraw.ImageDraw,
+    box: tuple[int, int, int, int],
+    code: str,
+    title_text: str,
+    body: str,
+    accent: str,
+    fill: str,
+) -> tuple[int, int, int, int]:
+    x1, y1, x2, y2 = box
+    draw.rounded_rectangle((x1 + 6, y1 + 7, x2 + 6, y2 + 7), radius=18, fill="#d8e0ea")
+    draw.rounded_rectangle(box, radius=18, fill=fill, outline="#d5dee9", width=2)
+    draw.rounded_rectangle((x1, y1, x1 + 54, y2), radius=18, fill=accent)
+    draw.text((x1 + 15, y1 + 38), code, fill="#ffffff", font=font(20))
+    draw.text((x1 + 74, y1 + 22), title_text, fill=accent, font=font(23))
+    draw_wrapped(draw, body, x1 + 74, y1 + 56, x2 - x1 - 94, font(20), fill="#172033", line_spacing=3)
+    return box
 
 
 def draw_node(
