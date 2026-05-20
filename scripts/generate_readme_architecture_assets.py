@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import math
 import sys
+import json
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -36,50 +37,176 @@ def main() -> None:
 
 
 def render_pipeline() -> Image.Image:
-    img = Image.new("RGB", (1800, 1000), "#f6f8fb")
+    metrics = read_pipeline_metrics()
+    img = Image.new("RGB", (1600, 2380), "#050607")
     draw = ImageDraw.Draw(img)
 
-    title(draw, "CAVE 모델 파이프라인", "파일 신뢰성 감사와 피해 확산 산정을 하나의 로컬 분석 흐름으로 연결")
+    center_text(draw, 800, 52, "CAVE 모델 파이프라인", font(50), "#f8fafc")
+    center_text(draw, 800, 118, "Credibility Audit for AI-Generated Evidence", font(24), "#94a3b8")
 
-    media = (70, 445, 292, 595)
-    group = (365, 190, 1145, 780)
-    audit = (1235, 245, 1515, 395)
-    harm = (1235, 555, 1515, 705)
-    output = (1235, 790, 1730, 890)
+    x = 800
+    input_box = (430, 180, 1170, 310)
+    l1_box = (420, 380, 765, 510)
+    l2_box = (835, 380, 1180, 510)
+    l3_box = (430, 660, 1170, 790)
+    l4_box = (430, 860, 1170, 990)
+    l5_box = (430, 1060, 1170, 1190)
+    l6_box = (430, 1260, 1170, 1390)
+    authentic_box = (115, 1510, 465, 1635)
+    clash_box = (600, 1510, 1000, 1635)
+    suspected_box = (1135, 1510, 1485, 1635)
+    l7_box = (430, 1815, 1170, 1945)
+    output_box = (430, 2030, 1170, 2160)
+    metrics_box = (110, 2190, 1490, 2345)
 
-    draw_node(draw, media, "Media Upload", "이미지·영상", "#ffffff", "#0f766e", icon="01")
+    pipeline_box(draw, input_box, "디지털 파일 입력", "이미지 · 영상", fill="#f5f2ea", outline="#e5e7eb")
+    down_arrow(draw, x, 310, 380)
 
-    draw.rounded_rectangle((group[0] + 8, group[1] + 10, group[2] + 8, group[3] + 10), radius=30, fill="#d8e0ea")
-    draw.rounded_rectangle(group, radius=30, fill="#ffffff", outline="#d5dee9", width=2)
-    draw.text((400, 220), "Evidence Layers", fill="#14213d", font=font(34))
-    draw.text((402, 265), "출처 신호와 AI 탐지 신호를 분리해 생성한 뒤 Layer 6에서 교차 검증합니다.", fill="#526071", font=font(22))
+    layer_label(draw, 86, 440, "출처\n레이어")
+    dashed_guide(draw, 190, 445, 405, 445)
+    pipeline_box(draw, l1_box, "L1 · C2PA 검증", "출처 기록 · 편집 이력", fill="#e7f2ff", outline="#38bdf8", title_color="#12467a")
+    pipeline_box(draw, l2_box, "L2 · 워터마킹", "AI 마커 · 메타 신호", fill="#e7f2ff", outline="#38bdf8", title_color="#12467a")
+    center_text(draw, 592, 535, "암호화 표준", font(21), "#a3e635")
+    center_text(draw, 1008, 535, "신호처리", font(21), "#a3e635")
+    connect_to_center(draw, l1_box, x, 610)
+    connect_to_center(draw, l2_box, x, 610)
+    down_arrow(draw, x, 610, 660)
 
-    draw.text((405, 330), "출처·무결성", fill="#526071", font=font(23))
-    l1 = draw_compact_card(draw, (405, 365, 625, 475), "L1", "C2PA", "Provenance", "#64748b", "#ffffff")
-    l2 = draw_compact_card(draw, (675, 365, 945, 475), "L2", "Watermark", "Metadata signal", "#64748b", "#ffffff")
-    arrow(draw, mid_right(l1), mid_left(l2), "#94a3b8", width=4)
+    layer_label(draw, 86, 725, "AI\n탐지")
+    dashed_guide(draw, 190, 735, 405, 735)
+    pipeline_box(draw, l3_box, "L3 · AI 탐지 모델", "SDXL detector · GenImage · EfficientNet/Xception/R3D", fill="#ecebff", outline="#8b5cf6", title_color="#4338ca")
+    down_arrow(draw, x, 790, 860)
+    pipeline_box(draw, l4_box, "L4 · rPPG 생체 신호", "CHROM rPPG + RandomForest · 영상 전용", fill="#ecebff", outline="#8b5cf6", title_color="#4338ca")
+    down_arrow(draw, x, 990, 1060)
+    pipeline_box(draw, l5_box, "L5 · 생성 모델 핑거프린트", "FFT · 잔차 노이즈 · RF attribution", fill="#ecebff", outline="#8b5cf6", title_color="#4338ca")
+    down_arrow(draw, x, 1190, 1260)
 
-    draw.text((405, 520), "AI 기반 탐지", fill="#0f766e", font=font(23))
-    l3 = draw_compact_card(draw, (405, 555, 605, 665), "L3", "AI Detector", "Image/video ensemble", "#0f766e", "#ecfdf5")
-    l4 = draw_compact_card(draw, (645, 555, 845, 665), "L4", "rPPG", "RF classifier", "#0f766e", "#ecfdf5")
-    l5 = draw_compact_card(draw, (885, 555, 1110, 665), "L5", "Fingerprint", "Generator attribution", "#0f766e", "#ecfdf5")
-    arrow(draw, mid_right(l3), mid_left(l4), "#0f766e", width=4)
-    arrow(draw, mid_right(l4), mid_left(l5), "#0f766e", width=4)
+    layer_label(draw, 86, 1328, "통합\n판정")
+    dashed_guide(draw, 190, 1330, 405, 1330)
+    pipeline_box(draw, l6_box, "L6 · Cross-layer Audit", "Cosine similarity · Integrity Clash 탐지", fill="#dcfce7", outline="#34d399", title_color="#047857")
+    down_arrow(draw, x, 1390, 1452)
+    draw.line((280, 1452, 1320, 1452), fill="#9ca3af", width=2)
+    branch_arrow(draw, 280, 1452, center_top(authentic_box))
+    branch_arrow(draw, x, 1452, center_top(clash_box))
+    branch_arrow(draw, 1320, 1452, center_top(suspected_box))
+    pipeline_box(draw, authentic_box, "진본 가능성", "레이어 일관 일치", fill="#dcfce7", outline="#34d399", title_color="#047857", title_size=29, body_size=22)
+    pipeline_box(draw, clash_box, "Integrity Clash", "전문가 정밀 감정 권고", fill="#fef3c7", outline="#f59e0b", title_color="#92400e", title_size=28, body_size=22)
+    pipeline_box(draw, suspected_box, "AI 생성 의심", "위조 가능성 높음", fill="#fee2e2", outline="#fb7185", title_color="#7f1d1d", title_size=28, body_size=22)
+    draw.line((280, 1760, 1320, 1760), fill="#9ca3af", width=2)
+    draw.line((280, 1635, 280, 1760), fill="#9ca3af", width=2)
+    draw.line((800, 1635, 800, 1760), fill="#9ca3af", width=2)
+    draw.line((1320, 1635, 1320, 1760), fill="#9ca3af", width=2)
+    down_arrow(draw, x, 1760, 1815)
 
-    draw.rounded_rectangle((405, 705, 1110, 745), radius=18, fill="#fff7ed", outline="#fed7aa", width=2)
-    draw.text((430, 715), "Image: diffusion + GenImage + RedFace · Video: face crop + rPPG + fingerprint", fill="#9a3412", font=font(19))
+    layer_label(draw, 86, 1870, "피해\n산정")
+    dashed_guide(draw, 190, 1875, 405, 1875)
+    pipeline_box(draw, l7_box, "L7 · 피해 규모 정량화", "GNN 확산 추적 · 재유포 RF · 가중 합산 30점", fill="#ecebff", outline="#8b5cf6", title_color="#4338ca")
+    down_arrow(draw, x, 1945, 2030)
 
-    draw_node(draw, audit, "Layer 6", "Cross-layer Audit", "#eef2ff", "#475569", icon="AUD")
-    draw_node(draw, harm, "Layer 7", "GNN Harm Assessment", "#ecfdf5", "#0f766e", icon="GNN")
-    draw_node(draw, output, "Output", "Verdict · Evidence · Harm Score", "#ffffff", "#b45309", icon="UI")
+    layer_label(draw, 86, 2085, "출력")
+    dashed_guide(draw, 190, 2095, 405, 2095)
+    pipeline_box(draw, output_box, "L8 · 최종 결과 요약", "판정 근거 · 피해 점수 · 정밀 감정 권고", fill="#f5f2ea", outline="#e5e7eb")
 
-    arrow(draw, mid_right(media), mid_left(group), "#94a3b8", width=5)
-    arrow(draw, mid_right(group), mid_left(audit), "#64748b", width=5)
-    arrow(draw, mid_bottom(audit), mid_top(harm), "#0f766e", width=5)
-    arrow(draw, mid_bottom(harm), mid_top(output), "#0f766e", width=5)
+    draw.rounded_rectangle(metrics_box, radius=18, fill="#050607", outline="#e5e7eb", width=2)
+    center_text(draw, 800, 2210, "주요 평가결과 (RedFace · FF++ C23 · Tiny-GenImage)", font(20), "#a3e635")
+    metric_text(draw, 290, 2250, "L3 이미지 탐지", metrics["l3_auc"])
+    metric_text(draw, 560, 2250, "L5 핑거프린트", metrics["l5_auc"])
+    metric_text(draw, 860, 2250, "L4 rPPG", metrics["l4_auc"])
+    metric_text(draw, 1160, 2250, "Attribution", metrics["attribution"])
+    center_text(draw, 800, 2320, "보조 신호로만 활용 / 법적 확정 판정기 아님", font(20), "#a3e635")
 
-    footer(draw, "AI 레이어: Layer 3, 4, 5, 7 · Layer 6은 출처/탐지 신호를 통합하는 판정 레이어", y=900)
     return img
+
+
+def read_pipeline_metrics() -> dict[str, str]:
+    image_calibration = read_json("image_calibration.json")
+    fingerprint_meta = read_json("fingerprint_classifier.meta.json")
+    rppg_meta = read_json("rppg_classifier.meta.json")
+    return {
+        "l3_auc": f"AUC {image_calibration.get('training_metrics', {}).get('auc', 0.0):.3f}",
+        "l5_auc": f"AUC {fingerprint_meta.get('test_auc', 0.0):.3f}",
+        "l4_auc": f"AUC {rppg_meta.get('test_auc', 0.0):.3f}",
+        "attribution": f"{fingerprint_meta.get('method_accuracy', 0.0) * 100:.1f}%",
+    }
+
+
+def read_json(filename: str) -> dict:
+    path = ROOT / "models" / filename
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def pipeline_box(
+    draw: ImageDraw.ImageDraw,
+    box: tuple[int, int, int, int],
+    title_text: str,
+    body: str,
+    *,
+    fill: str,
+    outline: str,
+    title_color: str = "#111827",
+    title_size: int = 32,
+    body_size: int = 24,
+) -> None:
+    x1, y1, x2, y2 = box
+    draw.rounded_rectangle((x1 + 5, y1 + 6, x2 + 5, y2 + 6), radius=18, fill="#27272a")
+    draw.rounded_rectangle(box, radius=18, fill=fill, outline=outline, width=2)
+    center_text(draw, (x1 + x2) // 2, y1 + 30, title_text, font(title_size), title_color)
+    center_text(draw, (x1 + x2) // 2, y1 + 76, body, font(body_size), "#4b5563")
+
+
+def center_text(
+    draw: ImageDraw.ImageDraw,
+    x: int,
+    y: int,
+    text: str,
+    text_font: ImageFont.FreeTypeFont,
+    fill: str,
+) -> None:
+    bbox = draw.textbbox((0, 0), text, font=text_font)
+    draw.text((x - (bbox[2] - bbox[0]) / 2, y), text, fill=fill, font=text_font)
+
+
+def metric_text(draw: ImageDraw.ImageDraw, x: int, y: int, label: str, value: str) -> None:
+    center_text(draw, x, y, label, font(19), "#a3e635")
+    center_text(draw, x, y + 32, value, font(27), "#2563eb")
+
+
+def layer_label(draw: ImageDraw.ImageDraw, x: int, y: int, text: str) -> None:
+    for index, line in enumerate(text.splitlines()):
+        draw.text((x, y + index * 34), line, fill="#a3e635", font=font(22))
+
+
+def dashed_guide(draw: ImageDraw.ImageDraw, x1: int, y1: int, x2: int, y2: int) -> None:
+    segment = 12
+    gap = 12
+    x = x1
+    while x < x2:
+        draw.line((x, y1, min(x + segment, x2), y2), fill="#d1d5db", width=2)
+        x += segment + gap
+
+
+def down_arrow(draw: ImageDraw.ImageDraw, x: int, y1: int, y2: int) -> None:
+    arrow(draw, (x, y1), (x, y2), "#6b7280", width=3)
+
+
+def connect_to_center(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int], x: int, y: int) -> None:
+    sx = (box[0] + box[2]) // 2
+    sy = box[3]
+    draw.line((sx, sy, sx, y - 50), fill="#9ca3af", width=2)
+    draw.line((sx, y - 50, x, y - 50), fill="#9ca3af", width=2)
+
+
+def branch_arrow(draw: ImageDraw.ImageDraw, x: int, y: int, end: tuple[int, int]) -> None:
+    ex, ey = end
+    draw.line((x, y, x, ey - 24), fill="#9ca3af", width=2)
+    arrow(draw, (x, ey - 24), (ex, ey), "#9ca3af", width=2)
+
+
+def center_top(box: tuple[int, int, int, int]) -> tuple[int, int]:
+    return ((box[0] + box[2]) // 2, box[1])
 
 
 def render_gnn_graph(damage: damage_score.DamageResult) -> Image.Image:
